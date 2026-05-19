@@ -4,6 +4,23 @@
 const SUPABASE_URL  = 'https://hmgvocclrpfypmflbyop.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZ3ZvY2NscnBmeXBtZmxieW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxOTM4NzcsImV4cCI6MjA5NDc2OTg3N30.U2LlSW3L_c7pW8ELQ9pRaegzg6mkwtoZE9DzFM_iPWc';
 const USER_COLORS  = ['#f0a500','#3fb950','#58a6ff','#ff7b72','#d2a8ff','#ffa657','#79c0ff','#f78166'];
+
+// Theme Chart.js to match the pub-night palette.
+if (window.Chart) {
+    Chart.defaults.color = '#a89878';           // var(--dim)
+    Chart.defaults.borderColor = '#483b2f';      // var(--border)
+    Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif";
+    Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(28, 22, 16, 0.95)';
+    Chart.defaults.plugins.tooltip.titleColor = '#f5ecd9';
+    Chart.defaults.plugins.tooltip.bodyColor = '#a89878';
+    Chart.defaults.plugins.tooltip.borderColor = '#5a4a3a';
+    Chart.defaults.plugins.tooltip.borderWidth = 1;
+    Chart.defaults.plugins.tooltip.cornerRadius = 8;
+    Chart.defaults.plugins.tooltip.padding = 10;
+    Chart.defaults.plugins.tooltip.displayColors = true;
+    Chart.defaults.plugins.tooltip.boxPadding = 5;
+}
+
 const ALCOHOL_UNIT_GRAMS = 12;
 let alcoholMode = localStorage.getItem('pl_alcohol_mode') || 'grams';
 
@@ -172,5 +189,5 @@ function showToast(msg, ok=true) {
 const CHART_OPTS = {
     responsive:true, maintainAspectRatio:false,
     plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>formatChartValue(c.parsed.y)}} },
-    scales:{ x:{ticks:{color:'#8b949e'},grid:{color:'#30363d'}}, y:{ticks:{color:'#8b949e'},grid:{color:'#30363d'},beginAtZero:true} }
+    scales:{ x:{ticks:{color:'#a89878'},grid:{color:'#483b2f'}}, y:{ticks:{color:'#a89878'},grid:{color:'#483b2f'},beginAtZero:true} }
 };

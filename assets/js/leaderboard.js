@@ -180,7 +180,7 @@ function renderLbBarChart(visible) {
         chLB=new Chart(document.getElementById('ch-lb').getContext('2d'),{
             type:'bar',
             data:{labels:visible.map(displayName),datasets:[{data:visible.map(u=>chartValue(u.rawGrams)),backgroundColor:visible.map(u=>(u.color||USER_COLORS[0])+'cc'),borderColor:visible.map(u=>u.color||USER_COLORS[0]),borderWidth:1,borderRadius:4}]},
-            options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>formatChartValue(c.parsed.y)}}},scales:{x:{ticks:{color:'#8b949e'},grid:{color:'#30363d'}},y:{ticks:{color:'#8b949e'},grid:{color:'#30363d'},beginAtZero:true}}}
+            options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>formatChartValue(c.parsed.y)}}},scales:{x:{ticks:{color:'#a89878'},grid:{color:'#483b2f'}},y:{ticks:{color:'#a89878'},grid:{color:'#483b2f'},beginAtZero:true}}}
         });
     } else {
         card.style.display='none';
@@ -247,12 +247,12 @@ function renderLbTimeline(visible,drinks,filter) {
             maintainAspectRatio:false,
             interaction:{mode:'index',intersect:false},
             plugins:{
-                legend:{display:users.length<=8,labels:{color:'#8b949e',boxWidth:10,boxHeight:10}},
+                legend:{display:users.length<=8,labels:{color:'#a89878',boxWidth:10,boxHeight:10}},
                 tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${formatChartValue(c.parsed.y)}`}}
             },
             scales:{
-                x:{ticks:{color:'#8b949e',maxRotation:0,autoSkip:true},grid:{color:'#30363d'}},
-                y:{ticks:{color:'#8b949e'},grid:{color:'#30363d'},beginAtZero:true}
+                x:{ticks:{color:'#a89878',maxRotation:0,autoSkip:true},grid:{color:'#483b2f'}},
+                y:{ticks:{color:'#a89878'},grid:{color:'#483b2f'},beginAtZero:true}
             }
         }
     });
