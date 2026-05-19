@@ -47,6 +47,8 @@ async function handleRegister() {
 function handleLogout() {
     if (lbChannel){sb.removeChannel(lbChannel);lbChannel=null;}
     if (feedChannel){sb.removeChannel(feedChannel);feedChannel=null;}
+    if (achChannel){sb.removeChannel(achChannel);achChannel=null;}
+    if (typeof achProfileUserId!=='undefined') achProfileUserId=null;
     localStorage.removeItem('pl_uid');
     CU=null; dtCache=null;
     document.getElementById('app').style.display='none';

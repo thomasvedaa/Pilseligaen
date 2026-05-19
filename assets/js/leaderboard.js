@@ -58,6 +58,7 @@ function renderLeaderboard(filter) {
     // Subscribe for real-time updates
     lbChannel = sb.channel('lb-realtime')
         .on('postgres_changes',{event:'*',schema:'public',table:'pl_drinks'},()=>fetchAndRenderLb(lbFilter))
+        .on('postgres_changes',{event:'*',schema:'public',table:'pl_users'},()=>fetchAndRenderLb(lbFilter))
         .subscribe();
 }
 
@@ -150,11 +151,10 @@ function renderLbList(ranked,visible) {
     el.innerHTML=visible.map((u,i)=>{
         const color=u.color||USER_COLORS[0];
         const isMe=u.id===CU.id;
-        const initial=userInitial(u);
         const name=displayName(u);
         return `<div class="lbr${isMe?' me':''}">
             <div class="lbrank ${i<3?'r'+(i+1):''}">${i<3?medals[i]:i+1}</div>
-            <div class="avatar" style="background:${color};width:28px;height:28px;font-size:.78em;flex-shrink:0">${esc(initial)}</div>
+            ${avatarHtml(u,28,'.78em')}
             <div class="lbmain">
                 <div class="lbtop">
                     <div class="lbn">${esc(name)}${isMe?'<span class="metag">(deg)</span>':''}</div>

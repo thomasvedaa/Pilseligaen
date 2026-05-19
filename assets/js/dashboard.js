@@ -2,6 +2,7 @@
    DASHBOARD
 ════════════════════════════════════════════ */
 const FEED_REACTIONS = ['🔥','😂','👏','💀','🍺'];
+let openInteractionDetailsId = null;
 
 async function renderDashboard() {
     document.getElementById('dash-stats').innerHTML='';
@@ -51,7 +52,7 @@ function ensureFeedRealtime() {
 }
 
 async function fetchFeedInteractions(drinkIds) {
-    const blank={ready:true,commentsByDrink:{},reactionsByDrink:{},myReactions:{}};
+    const blank={ready:true,commentsByDrink:{},commentUsersByDrink:{},reactionsByDrink:{},reactionUsersByDrink:{},myReactions:{}};
     if (!drinkIds.length) return blank;
 
     const [commentsRes,reactionsRes] = await Promise.all([
@@ -65,12 +66,16 @@ async function fetchFeedInteractions(drinkIds) {
 
     (commentsRes.data||[]).forEach(c=>{
         (blank.commentsByDrink[c.drink_id] ||= []).push(c);
+        const commenters=(blank.commentUsersByDrink[c.drink_id] ||= []);
+        if (!commenters.includes(c.user_id)) commenters.push(c.user_id);
     });
 
     (reactionsRes.data||[]).forEach(r=>{
         const drinkReactions=(blank.reactionsByDrink[r.drink_id] ||= {});
         const emojiStats=(drinkReactions[r.emoji] ||= {count:0,active:false});
         emojiStats.count++;
+        const drinkReactionUsers=(blank.reactionUsersByDrink[r.drink_id] ||= {});
+        (drinkReactionUsers[r.emoji] ||= []).push(r.user_id);
         if (r.user_id===CU.id) {
             emojiStats.active=true;
             blank.myReactions[`${r.drink_id}:${r.emoji}`]=r.id;
@@ -83,44 +88,96 @@ async function fetchFeedInteractions(drinkIds) {
 async function renderDrinkFeed() {
     const el=document.getElementById('drink-feed');
     const [{data:drinks,error},{data:users}] = await Promise.all([
-        sb.from('pl_drinks').select('*').order('ts',{ascending:false}).limit(30),
+        sb.from('pl_drinks').select('*').order('ts',{ascending:false}),
         sb.from('pl_users').select('*')
     ]);
     if (error){el.innerHTML=`<div class="empty">Feil: ${esc(error.message)}</div>`;return;}
 
     const byUser={};
     (users||[]).forEach(u=>{byUser[u.id]=u;});
-    const feed=drinks||[];
+    const allDrinks=drinks||[];
+    const drinkEvents=allDrinks.map(d=>({id:`drink:${d.id}`,kind:'drink',ts:d.ts,drink:d}));
+    const achEvents=typeof achievementFeedEvents==='function' ? achievementFeedEvents(users||[],allDrinks) : [];
+    const feed=[...drinkEvents,...achEvents].sort((a,b)=>new Date(b.ts)-new Date(a.ts)).slice(0,30);
     if (!feed.length){el.innerHTML='<div class="empty">Ingen aktivitet ennå.</div>';return;}
-    const interactions=await fetchFeedInteractions(feed.map(d=>d.id));
+    const drinkIds=feed.filter(e=>e.kind==='drink').map(e=>e.drink.id);
+    const interactions=await fetchFeedInteractions(drinkIds);
 
     const schemaNotice=interactions.ready?'':'<div class="feed-disabled global">Kjør oppdatert schema.sql for å aktivere kommentarer og reaksjoner.</div>';
-    el.innerHTML=schemaNotice+feed.map(d=>{
-        const user=byUser[d.user_id]||{username:'Ukjent',color:USER_COLORS[0]};
-        const isMe=d.user_id===CU.id;
-        const comments=interactions.commentsByDrink[d.id]||[];
-        const reactions=interactions.reactionsByDrink[d.id]||{};
-        return `<div class="feed-item">
-            <div class="feed-head">
-                <div class="avatar" style="background:${user.color||USER_COLORS[0]};width:30px;height:30px;font-size:.78em">${esc(userInitial(user))}</div>
-                <div class="dinf">
-                    <div class="dn">${esc(displayName(user))}${isMe?'<span class="metag">(deg)</span>':''} drakk ${esc(d.type_name)}${d.qty!==1?` ×${d.qty}`:''}</div>
-                    <div class="dm">${fmtDate(d.ts)}${d.note?' · '+esc(d.note):''}</div>
-                </div>
-                <div class="dr"><span class="dg">${formatAlcohol(d.grams)}</span></div>
-            </div>
-            ${interactions.ready?renderFeedReactions(d.id,reactions):''}
-            ${interactions.ready?renderFeedComments(comments,byUser):''}
-            ${interactions.ready?renderFeedCommentForm(d.id):''}
-        </div>`;
-    }).join('');
+    el.innerHTML=schemaNotice+feed.map(e=>e.kind==='achievement'
+        ? renderAchievementFeedItem(e,byUser)
+        : renderDrinkFeedItem(e.drink,interactions,byUser)
+    ).join('');
 }
 
-function renderFeedReactions(drinkId,reactions) {
+function renderDrinkFeedItem(d,interactions,byUser) {
+    const user=byUser[d.user_id]||{username:'Ukjent',color:USER_COLORS[0]};
+    const isMe=d.user_id===CU.id;
+    const comments=interactions.commentsByDrink[d.id]||[];
+    const commentUsers=interactions.commentUsersByDrink[d.id]||[];
+    const reactions=interactions.reactionsByDrink[d.id]||{};
+    const reactionUsers=interactions.reactionUsersByDrink[d.id]||{};
+    return `<div class="feed-item">
+        <div class="feed-head">
+            ${avatarHtml(user,30,'.78em')}
+            <div class="dinf">
+                <div class="dn">${esc(displayName(user))}${isMe?'<span class="metag">(deg)</span>':''} drakk ${esc(d.type_name)}${d.qty!==1?` ×${d.qty}`:''}</div>
+                <div class="dm">${fmtDate(d.ts)}${d.note?' · '+esc(d.note):''}</div>
+            </div>
+            <div class="dr"><span class="dg">${formatAlcohol(d.grams)}</span></div>
+        </div>
+        ${interactions.ready?renderFeedReactions(d.id,reactions,reactionUsers,commentUsers,byUser):''}
+        ${interactions.ready?renderFeedComments(comments,byUser):''}
+        ${interactions.ready?renderFeedCommentForm(d.id):''}
+    </div>`;
+}
+
+function renderAchievementFeedItem(event,byUser) {
+    const user=byUser[event.user_id]||event.user||{username:'Ukjent',color:USER_COLORS[0]};
+    const isMe=event.user_id===CU.id;
+    return `<div class="feed-item achievement">
+        <div class="feed-head">
+            ${avatarHtml(user,30,'.78em')}
+            <div class="dinf">
+                <div class="dn">${esc(displayName(user))}${isMe?'<span class="metag">(deg)</span>':''} låste opp ${event.achievement.icon} ${esc(event.achievement.name)}</div>
+                <div class="dm">${fmtDate(event.ts)} · ${esc(event.achievement.desc)}</div>
+            </div>
+            <div class="dr"><span class="dg">🏅</span></div>
+        </div>
+    </div>`;
+}
+
+function renderFeedReactions(drinkId,reactions,reactionUsers,commentUsers,usersById) {
+    const total=Object.values(reactions).reduce((sum,r)=>sum+(r.count||0),0);
+    const hasInteractions=total>0 || commentUsers.length>0;
     return `<div class="feed-actions">${FEED_REACTIONS.map(emoji=>{
         const stats=reactions[emoji]||{count:0,active:false};
         return `<button class="react-btn${stats.active?' active':''}" onclick="toggleFeedReaction('${drinkId}','${emoji}')">${emoji} ${stats.count||''}</button>`;
-    }).join('')}</div>`;
+    }).join('')}${hasInteractions?`<button class="react-detail-btn" onclick="toggleInteractionDetails('${drinkId}')">${openInteractionDetailsId===drinkId?'Skjul':'Hvem interagerte?'}</button>`:''}</div>
+    ${openInteractionDetailsId===drinkId?renderInteractionDetails(reactionUsers,commentUsers,usersById):''}`;
+}
+
+function renderInteractionDetails(reactionUsers,commentUsers,usersById) {
+    const namesFor=(ids)=>[...new Set(ids)]
+        .map(id=>usersById[id]?displayName(usersById[id]):'Ukjent')
+        .map(esc)
+        .join(', ');
+    const rows=[];
+    if (commentUsers.length) {
+        rows.push(`<div class="react-detail-row"><span>💬</span><span><strong>Kommenterte:</strong> ${namesFor(commentUsers)}</span></div>`);
+    }
+    rows.push(...FEED_REACTIONS
+        .filter(emoji=>(reactionUsers[emoji]||[]).length)
+        .map(emoji=>{
+            const names=namesFor(reactionUsers[emoji]||[]);
+            return `<div class="react-detail-row"><span>${emoji}</span><span>${names}</span></div>`;
+        }));
+    return rows.length?`<div class="react-details">${rows.join('')}</div>`:'';
+}
+
+function toggleInteractionDetails(drinkId) {
+    openInteractionDetailsId=openInteractionDetailsId===drinkId?null:drinkId;
+    renderDrinkFeed();
 }
 
 function renderFeedComments(comments,usersById) {

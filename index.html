@@ -50,7 +50,10 @@
             <div class="avatar" id="usr-av">?</div>
             <span class="uname" id="usr-nm"></span>
             <button class="icon-btn" onclick="editNickname()">Navn</button>
-            <button class="unit-toggle" id="unit-toggle" onclick="toggleAlcoholMode()" title="Bytt mellom gram og alkoholenheter">g</button>
+            <button class="icon-btn" onclick="editAvatar()">Bilde</button>
+            <button class="unit-toggle" id="unit-toggle" onclick="toggleAlcoholMode()" aria-label="Bytt mellom gram alkohol og alkoholenheter" title="Bytt mellom gram alkohol og alkoholenheter">
+                <span class="unit-choice active">Gram</span><span class="unit-swap">↔</span><span class="unit-choice">Enheter</span>
+            </button>
             <button class="icon-btn" onclick="handleLogout()">Logg ut</button>
         </div>
     </div>
@@ -203,11 +206,26 @@
         <div class="card"><div id="dt-list"><div class="vload"><div class="spinner"></div>Laster…</div></div></div>
     </div>
 
+    <!-- ACHIEVEMENTS -->
+    <div class="view" id="view-achievements">
+        <div class="sh" style="margin-bottom:16px">
+            <h2 style="margin:0">🏅 Merker</h2>
+            <span class="live-badge"><span class="live-dot"></span>Live</span>
+        </div>
+        <div id="ach-list"><div class="vload"><div class="spinner"></div>Laster…</div></div>
+    </div>
+
+    <!-- PROFILE DETAIL -->
+    <div class="view" id="view-profile">
+        <div id="profile-detail"><div class="vload"><div class="spinner"></div>Laster…</div></div>
+    </div>
+
     <nav class="bottom-nav">
         <button class="nav-item active" onclick="showView('dashboard',this)"><span class="nav-icon">🏠</span><span>Hjem</span></button>
         <button class="nav-item" onclick="showView('log',this)"><span class="nav-icon">➕</span><span>Registrer</span></button>
         <button class="nav-item" onclick="showView('stats',this)"><span class="nav-icon">📊</span><span>Statistikk</span></button>
         <button class="nav-item" onclick="showView('lb',this)"><span class="nav-icon">🏆</span><span>Topp</span></button>
+        <button class="nav-item" onclick="showView('achievements',this)"><span class="nav-icon">🏅</span><span>Merker</span></button>
         <button class="nav-item" onclick="showView('drinks',this)"><span class="nav-icon">🍺</span><span>Kort</span></button>
     </nav>
 </div>
@@ -222,5 +240,6 @@
 <script src="assets/js/dashboard.js"></script>
 <script src="assets/js/stats.js"></script>
 <script src="assets/js/leaderboard.js"></script>
+<script src="assets/js/achievements.js"></script>
 </body>
 </html>

@@ -36,6 +36,37 @@ function displayName(user) {
 function userInitial(user) {
     return displayName(user)[0].toUpperCase();
 }
+function cleanAvatarUrl(value) {
+    const raw=String(value||'').trim();
+    if (!raw) return '';
+    try {
+        const url=new URL(raw);
+        if (!['http:','https:'].includes(url.protocol)) return '';
+        return url.href.slice(0,500);
+    } catch {
+        return '';
+    }
+}
+function avatarImgTag(user) {
+    const url=cleanAvatarUrl(user?.avatar_url);
+    if (!url) return '';
+    return `<img src="${esc(url)}" alt="${esc(displayName(user))}" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove();this.parentElement.classList.remove('has-img');this.parentElement.textContent=this.parentElement.dataset.initial">`;
+}
+function avatarHtml(user, size=30, fontSize='.82em') {
+    const color=user?.color||USER_COLORS[0];
+    const image=avatarImgTag(user);
+    const cls=image?'avatar has-img':'avatar';
+    const content=image || esc(userInitial(user));
+    return `<div class="${cls}" data-initial="${esc(userInitial(user))}" style="background:${color};width:${size}px;height:${size}px;font-size:${fontSize};flex-shrink:0">${content}</div>`;
+}
+function setAvatarElement(el,user) {
+    if (!el) return;
+    const image=avatarImgTag(user);
+    el.className=image?'avatar has-img':'avatar';
+    el.dataset.initial=userInitial(user);
+    el.style.background=user?.color||USER_COLORS[0];
+    el.innerHTML=image || esc(userInitial(user));
+}
 function alcoholDisplayValue(gramsValue) {
     const raw=Number(gramsValue)||0;
     if (alcoholMode==='units') {

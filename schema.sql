@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS public.pl_users (
     id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     username    TEXT        NOT NULL,
     nickname    TEXT,
+    avatar_url  TEXT,
     username_lc TEXT        UNIQUE NOT NULL,   -- lowercase, brukes for case-insensitive innlogging
     password    TEXT        NOT NULL,           -- klartekst (venneapp, ikke sensitiv)
     color       TEXT        NOT NULL DEFAULT '#f0a500',
@@ -15,7 +16,8 @@ CREATE TABLE IF NOT EXISTS public.pl_users (
 );
 
 ALTER TABLE public.pl_users
-    ADD COLUMN IF NOT EXISTS nickname TEXT;
+    ADD COLUMN IF NOT EXISTS nickname TEXT,
+    ADD COLUMN IF NOT EXISTS avatar_url TEXT;
 
 UPDATE public.pl_users
 SET nickname = username
