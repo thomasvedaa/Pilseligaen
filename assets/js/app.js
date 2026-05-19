@@ -6,6 +6,9 @@ async function startApp(user) {
     updateUserHeader();
     document.getElementById('app').style.display='block';
     updateAlcoholModeButton();
+    await loadEvents();
+    ensureEventRealtime();
+    updateEventControls();
     resetDt();
     await renderDashboard();
     await populateLogSelect();
@@ -78,7 +81,8 @@ function showView(name, btn) {
     if (name==='lb')        renderLeaderboard(lbFilter);
     if (name==='achievements') renderAchievements();
     if (name==='drinks')    renderDtList();
-    if (name==='log')       {populateLogSelect(); resetDt();}
+    if (name==='events')    renderEvents();
+    if (name==='log')       {populateLogSelect(); resetDt(); renderMyDrinksList();}
 }
 
 function activeViewName() {
@@ -105,9 +109,11 @@ async function refreshActiveViewForAlcoholMode() {
     if (view==='achievements') await renderAchievements();
     if (view==='profile') await renderAchievementProfile(achProfileUserId);
     if (view==='drinks') await renderDtList();
+    if (view==='events') await renderEvents();
     if (view==='log') {
         await populateLogSelect();
         await updateLogPreview();
+        await renderMyDrinksList();
     }
 }
 

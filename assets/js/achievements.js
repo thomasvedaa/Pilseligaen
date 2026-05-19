@@ -6,25 +6,36 @@ let achProfileUserId=null;
 
 const ACHIEVEMENTS = [
     {id:'first', icon:'🥂', name:'Første skål', desc:'Registrerte sin første drink.', check:s=>s.totalDrinks>=1, progress:s=>`${Math.min(s.totalDrinks,1)}/1`},
+    {id:'units10', icon:'🥉', name:'Fersk', desc:'10 alkoholenheter totalt.', check:s=>s.totalUnits>=10, progress:s=>`${fmtAchievementUnits(Math.min(s.totalUnits,10))}/10 enheter`},
+    {id:'units100', icon:'🥈', name:'Godt i gang', desc:'100 alkoholenheter totalt.', check:s=>s.totalUnits>=100, progress:s=>`${fmtAchievementUnits(Math.min(s.totalUnits,100))}/100 enheter`},
+    {id:'units1000', icon:'🥇', name:'Veteran', desc:'1000 alkoholenheter totalt.', check:s=>s.totalUnits>=1000, progress:s=>`${fmtAchievementUnits(Math.min(s.totalUnits,1000))}/1000 enheter`},
+    {id:'units5000', icon:'💀', name:'Legenden', desc:'5000 alkoholenheter totalt.', check:s=>s.totalUnits>=5000, progress:s=>`${fmtAchievementUnits(Math.min(s.totalUnits,5000))}/5000 enheter`},
     {id:'streak10', icon:'🔥', name:'10 dager streak', desc:'Drakk 10 dager på rad.', check:s=>s.bestStreak>=10, progress:s=>`${Math.min(s.bestStreak,10)}/10 dager`},
     {id:'streak100', icon:'🔥', name:'100 dager streak', desc:'Drakk 100 dager på rad.', check:s=>s.bestStreak>=100, progress:s=>`${Math.min(s.bestStreak,100)}/100 dager`},
-    {id:'twelve_half', icon:'🍺', name:'12 × 0,5 på en kveld', desc:'Minst 12 halvlitere øl i samme kveld.', check:s=>s.maxEveningHalfLiters>=12, progress:s=>`${fmtNo(Math.min(s.maxEveningHalfLiters,12),1)}/12`},
-    {id:'chilli_klaus', icon:'🌶️', name:'Chilli Klaus', desc:'Logget noe med chilli, chili eller Klaus.', check:s=>s.hasChilli, progress:s=>s.hasChilli?'Klar':'0/1'},
-    {id:'weekend', icon:'🌙', name:'Helgekriger', desc:'Drakk både fredag og lørdag i samme helg.', check:s=>s.hasWeekendPair, progress:s=>s.hasWeekendPair?'Klar':'0/1'},
+    {id:'twelve_half', icon:'🍺', name:'Yummers', desc:'Minst 12 halvlitere øl i samme kveld.', check:s=>s.maxEveningHalfLiters>=12, progress:s=>`${fmtNo(Math.min(s.maxEveningHalfLiters,12),1)}/12`},
+    {id:'chilli_klaus', icon:'🌶️', name:'Chili Klaus', desc:'Tatt deg en shot med guds gave', check:s=>s.hasChilli, progress:s=>s.hasChilli?'Klar':'0/1'},
+    {id:'morningbird', icon:'🌅', name:'Six seven', desc:'Registrerte en drink mellom 06 og 07.', check:s=>s.hasMorning, progress:s=>s.hasMorning?'Klar':'0/1'},
+    {id:'weekend', icon:'🌙', name:'Helgekriger', desc:'Drakk torsdag, fredag og lørdag i samme helg.', check:s=>s.hasWeekendRun, progress:s=>s.hasWeekendRun?'Klar':'0/1'},
     {id:'variety', icon:'🎨', name:'Variert meny', desc:'Øl, vin og sprit på samme dag.', check:s=>s.hasAllCategoriesDay, progress:s=>s.hasAllCategoriesDay?'Klar':'0/1'},
     {id:'nightowl', icon:'🦉', name:'Nattugle', desc:'Registrerte en drink mellom 02 og 06.', check:s=>s.hasLateNight, progress:s=>s.hasLateNight?'Klar':'0/1'},
-    {id:'comeback', icon:'↩️', name:'Comeback kid', desc:'Drakk igjen etter minst 14 dager pause.', check:s=>s.hasComeback, progress:s=>s.hasComeback?'Klar':'0/1'},
     {id:'regular', icon:'📅', name:'Fast inventar', desc:'30 forskjellige drikkedager.', check:s=>s.drinkDays>=30, progress:s=>`${Math.min(s.drinkDays,30)}/30 dager`},
     {id:'month10', icon:'🗓️', name:'Månedens stamkunde', desc:'10 drikkedager i samme måned.', check:s=>s.maxMonthDays>=10, progress:s=>`${Math.min(s.maxMonthDays,10)}/10 dager`},
     {id:'beer50', icon:'🍻', name:'50 liter øl', desc:'Totalt 50 liter øl registrert.', check:s=>s.liters.beer>=50, progress:s=>`${fmtLiters(Math.min(s.liters.beer,50))}/50 L`},
     {id:'month_beer50', icon:'🍺', name:'Alkoholiker', desc:'50 liter øl i samme måned.', check:s=>s.maxMonthBeerLiters>=50, progress:s=>`${fmtLiters(Math.min(s.maxMonthBeerLiters,50))}/50 L`},
     {id:'month_beer100', icon:'🚨', name:'Du har et problem', desc:'100 liter øl i samme måned.', check:s=>s.maxMonthBeerLiters>=100, progress:s=>`${fmtLiters(Math.min(s.maxMonthBeerLiters,100))}/100 L`},
     {id:'wine10', icon:'🍷', name:'Vinvenn', desc:'Totalt 10 liter vin registrert.', check:s=>s.liters.wine>=10, progress:s=>`${fmtLiters(Math.min(s.liters.wine,10))}/10 L`},
+    {id:'wine50', icon:'🍷', name:'Vinmester', desc:'Totalt 50 liter vin registrert.', check:s=>s.liters.wine>=50, progress:s=>`${fmtLiters(Math.min(s.liters.wine,50))}/50 L`},
     {id:'spirits1', icon:'🥃', name:'Spritsertifikat', desc:'Totalt 1 liter sprit registrert.', check:s=>s.liters.spirits>=1, progress:s=>`${fmtLiters(Math.min(s.liters.spirits,1))}/1 L`},
+    {id:'spirits10', icon:'🥃', name:'Spritsertifikat', desc:'Totalt 10 liter sprit registrert.', check:s=>s.liters.spirits>=10, progress:s=>`${fmtLiters(Math.min(s.liters.spirits,10))}/10 L`},
+
 ];
 
 function achievementById(id) {
     return ACHIEVEMENTS.find(a=>a.id===id);
+}
+
+function fmtAchievementUnits(value) {
+    return fmtNo(value, value>=100?0:1);
 }
 
 function keyToDate(key) {
@@ -55,8 +66,9 @@ function monthKey(key) {
 function weekendKeyForDrink(iso) {
     const d=new Date(iso);
     const day=d.getDay();
-    if (day!==5 && day!==6) return null;
-    if (day===6) d.setDate(d.getDate()-1);
+    if (![4,5,6].includes(day)) return null;
+    if (day===5) d.setDate(d.getDate()-1);
+    if (day===6) d.setDate(d.getDate()-2);
     return dayKey(d);
 }
 
@@ -86,6 +98,8 @@ function streakStats(days) {
 
 function summarizeAchievements(user,drinks) {
     const sorted=[...drinks].sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+    const totalGrams=sorted.reduce((sum,d)=>sum+(Number(d.grams)||0),0);
+    const totalUnits=totalGrams/ALCOHOL_UNIT_GRAMS;
     const days=[...new Set(sorted.map(d=>dayKey(d.ts)))].sort();
     const streak=streakStats(days);
     const liters={beer:0,wine:0,spirits:0};
@@ -95,6 +109,7 @@ function summarizeAchievements(user,drinks) {
     const monthDays={};
     const monthBeerLiters={};
     let hasChilli=false;
+    let hasMorning=false;
     let hasLateNight=false;
     let hasComeback=false;
 
@@ -115,6 +130,7 @@ function summarizeAchievements(user,drinks) {
         if (/(chilli|chili|klaus)/.test(txt)) hasChilli=true;
 
         const hour=new Date(d.ts).getHours();
+        if (hour>=6 && hour<7) hasMorning=true;
         if (hour>=2 && hour<6) hasLateNight=true;
 
         const wk=weekendKeyForDrink(d.ts);
@@ -131,21 +147,24 @@ function summarizeAchievements(user,drinks) {
 
     const maxEveningHalfLiters=Math.max(0,...Object.values(eveningHalfLiters));
     const hasAllCategoriesDay=Object.values(dayCategories).some(set=>set.has('beer') && set.has('wine') && set.has('spirits'));
-    const hasWeekendPair=Object.values(weekendMap).some(set=>set.has(5) && set.has(6));
+    const hasWeekendRun=Object.values(weekendMap).some(set=>set.has(4) && set.has(5) && set.has(6));
     const maxMonthDays=Math.max(0,...Object.values(monthDays).map(set=>set.size));
     const maxMonthBeerLiters=Math.max(0,...Object.values(monthBeerLiters));
     const unlocked=ACHIEVEMENTS.filter(a=>a.check({
         user,
         totalDrinks:sorted.length,
+        totalGrams,
+        totalUnits,
         drinkDays:days.length,
         currentStreak:streak.current,
         bestStreak:streak.best,
         liters,
         maxEveningHalfLiters,
         hasChilli,
+        hasMorning,
         hasLateNight,
         hasComeback,
-        hasWeekendPair,
+        hasWeekendRun,
         hasAllCategoriesDay,
         maxMonthDays,
         maxMonthBeerLiters
@@ -155,6 +174,8 @@ function summarizeAchievements(user,drinks) {
         user,
         drinks:sorted,
         totalDrinks:sorted.length,
+        totalGrams,
+        totalUnits,
         drinkDays:days.length,
         currentStreak:streak.current,
         bestStreak:streak.best,
@@ -163,9 +184,10 @@ function summarizeAchievements(user,drinks) {
         liters,
         maxEveningHalfLiters,
         hasChilli,
+        hasMorning,
         hasLateNight,
         hasComeback,
-        hasWeekendPair,
+        hasWeekendRun,
         hasAllCategoriesDay,
         maxMonthDays,
         maxMonthBeerLiters,
@@ -184,6 +206,7 @@ function achievementUnlockEvents(user,drinks) {
     const weekendMap={};
     const monthBeerLiters={};
     const liters={beer:0,wine:0,spirits:0};
+    let totalGrams=0;
     let lastDay=null;
     let dayRun=0;
 
@@ -208,8 +231,14 @@ function achievementUnlockEvents(user,drinks) {
         const m=monthKey(k);
         const category=drinkCategory(d);
         const vol=((Number(d.vol_ml)||0)*(Number(d.qty)||1))/1000;
+        totalGrams+=Number(d.grams)||0;
+        const totalUnits=totalGrams/ALCOHOL_UNIT_GRAMS;
 
         if (i===0) unlock('first',d);
+        if (totalUnits>=10) unlock('units10',d);
+        if (totalUnits>=100) unlock('units100',d);
+        if (totalUnits>=1000) unlock('units1000',d);
+        if (totalUnits>=5000) unlock('units5000',d);
 
         if (!days.has(k)) {
             days.add(k);
@@ -242,13 +271,14 @@ function achievementUnlockEvents(user,drinks) {
         if (/(chilli|chili|klaus)/.test(txt)) unlock('chilli_klaus',d);
 
         const hour=new Date(d.ts).getHours();
+        if (hour>=6 && hour<7) unlock('morningbird',d);
         if (hour>=2 && hour<6) unlock('nightowl',d);
 
         const wk=weekendKeyForDrink(d.ts);
         if (wk) {
             const day=new Date(d.ts).getDay();
             (weekendMap[wk] ||= new Set()).add(day);
-            if (weekendMap[wk].has(5) && weekendMap[wk].has(6)) unlock('weekend',d);
+            if (weekendMap[wk].has(4) && weekendMap[wk].has(5) && weekendMap[wk].has(6)) unlock('weekend',d);
         }
 
         if (i>0) {
@@ -283,13 +313,15 @@ async function loadAchievementData() {
     ]);
     if (userError || drinkError) return {error:userError||drinkError};
 
+    const scopeUsers=await fetchUsersForCurrentScope(users||[]);
+    const scopeDrinks=visibleDrinksForScope(drinks||[]);
     const drinksByUser={};
-    (drinks||[]).forEach(d=>{(drinksByUser[d.user_id] ||= []).push(d);});
-    const summaries=(users||[])
+    scopeDrinks.forEach(d=>{(drinksByUser[d.user_id] ||= []).push(d);});
+    const summaries=scopeUsers
         .map(u=>summarizeAchievements(u,drinksByUser[u.id]||[]))
         .sort((a,b)=>b.unlockedCount-a.unlockedCount || b.bestStreak-a.bestStreak || displayName(a.user).localeCompare(displayName(b.user),'no'));
 
-    return {users:users||[],drinks:drinks||[],summaries,unlockStats:achievementUnlockStats(summaries)};
+    return {users:scopeUsers,drinks:scopeDrinks,summaries,unlockStats:achievementUnlockStats(summaries)};
 }
 
 function renderStreakBadge(summary) {

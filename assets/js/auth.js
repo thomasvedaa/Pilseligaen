@@ -48,9 +48,11 @@ function handleLogout() {
     if (lbChannel){sb.removeChannel(lbChannel);lbChannel=null;}
     if (feedChannel){sb.removeChannel(feedChannel);feedChannel=null;}
     if (achChannel){sb.removeChannel(achChannel);achChannel=null;}
+    if (eventChannel){sb.removeChannel(eventChannel);eventChannel=null;}
     if (typeof achProfileUserId!=='undefined') achProfileUserId=null;
     localStorage.removeItem('pl_uid');
-    CU=null; dtCache=null;
+    localStorage.removeItem('pl_event_filter');
+    CU=null; dtCache=null; eventCache=[]; currentEventId='';
     document.getElementById('app').style.display='none';
     document.getElementById('auth-screen').style.display='flex';
     document.getElementById('li-user').value=''; document.getElementById('li-pass').value='';

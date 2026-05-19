@@ -18,7 +18,7 @@ function setTlMode(btn,mode) {
 async function renderStats() {
     document.getElementById('stats-sum').innerHTML='<div style="grid-column:1/-1" class="vload"><div class="spinner"></div>Laster…</div>';
     const {data:all}=await sb.from('pl_drinks').select('*').eq('user_id',CU.id);
-    const drinks=all||[];
+    const drinks=visibleDrinksForScope(all||[]);
     const total=drinks.reduce((s,d)=>s+d.grams,0);
     const days=new Set(drinks.map(d=>new Date(d.ts).toDateString())).size;
     const avg=days>0?total/days:0;

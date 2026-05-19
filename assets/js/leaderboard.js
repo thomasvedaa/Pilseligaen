@@ -117,7 +117,7 @@ function hideLbCharts() {
 
 async function fetchAndRenderLb(filter) {
     const {start,end}=getLbRange(filter);
-    let drinkQuery=sb.from('pl_drinks').select('user_id,type_name,vol_ml,abv,qty,grams,ts');
+    let drinkQuery=sb.from('pl_drinks').select('user_id,event_id,type_name,vol_ml,abv,qty,grams,ts');
     if (start) drinkQuery=drinkQuery.gte('ts',start.toISOString());
     if (end) drinkQuery=drinkQuery.lt('ts',end.toISOString());
 
@@ -125,8 +125,9 @@ async function fetchAndRenderLb(filter) {
     const {data:usersRaw}     = await sb.from('pl_users').select('*');
     if (!allDrinksRaw||!usersRaw) return;
 
-    const drinks=allDrinksRaw||[];
-    const ranked=aggregateLeaderboard(usersRaw,drinks);
+    const users=await fetchUsersForCurrentScope(usersRaw||[]);
+    const drinks=visibleDrinksForScope(allDrinksRaw||[]);
+    const ranked=aggregateLeaderboard(users,drinks);
     const el=document.getElementById('lb-list');
 
     if (ranked.every(u=>u.rawGrams===0)){

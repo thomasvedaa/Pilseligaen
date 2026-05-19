@@ -12,7 +12,7 @@ async function renderDashboard() {
     renderDrinkFeed();
     const {data:drinks,error}=await sb.from('pl_drinks').select('*').eq('user_id',CU.id);
     if (error){document.getElementById('recent-drinks').innerHTML=`<div class="empty">Feil: ${error.message}</div>`;return;}
-    const all=drinks||[];
+    const all=visibleDrinksForScope(drinks||[]);
     const now=new Date();
     const wkS=new Date(now); wkS.setDate(now.getDate()-(now.getDay()===0?6:now.getDay()-1)); wkS.setHours(0,0,0,0);
     const mS=new Date(now.getFullYear(),now.getMonth(),1);
@@ -32,11 +32,11 @@ async function renderDashboard() {
             <span class="dico">${drinkIcon(d.abv)}</span>
             <div class="dinf">
                 <div class="dn">${esc(d.type_name)}${d.qty!==1?` ×${d.qty}`:''}</div>
-                <div class="dm">${fmtDate(d.ts)}${d.note?' · '+esc(d.note):''}</div>
+                <div class="dm">${fmtDate(d.ts)}${eventMeta(d)}${d.note?' · '+esc(d.note):''}</div>
             </div>
             <div class="dr">
                 <span class="dg">${formatAlcohol(d.grams)}</span>
-                <button class="del" onclick="deleteDrink('${d.id}')">✕</button>
+                <button class="del del-txt" onclick="deleteDrink('${d.id}')">Slett</button>
             </div>
         </div>`).join('');
 }
@@ -93,11 +93,12 @@ async function renderDrinkFeed() {
     ]);
     if (error){el.innerHTML=`<div class="empty">Feil: ${esc(error.message)}</div>`;return;}
 
+    const scopeUsers=await fetchUsersForCurrentScope(users||[]);
     const byUser={};
     (users||[]).forEach(u=>{byUser[u.id]=u;});
-    const allDrinks=drinks||[];
+    const allDrinks=visibleDrinksForScope(drinks||[]);
     const drinkEvents=allDrinks.map(d=>({id:`drink:${d.id}`,kind:'drink',ts:d.ts,drink:d}));
-    const achEvents=typeof achievementFeedEvents==='function' ? achievementFeedEvents(users||[],allDrinks) : [];
+    const achEvents=typeof achievementFeedEvents==='function' ? achievementFeedEvents(scopeUsers,allDrinks) : [];
     const feed=[...drinkEvents,...achEvents].sort((a,b)=>new Date(b.ts)-new Date(a.ts)).slice(0,30);
     if (!feed.length){el.innerHTML='<div class="empty">Ingen aktivitet ennå.</div>';return;}
     const drinkIds=feed.filter(e=>e.kind==='drink').map(e=>e.drink.id);
@@ -122,9 +123,12 @@ function renderDrinkFeedItem(d,interactions,byUser) {
             ${avatarHtml(user,30,'.78em')}
             <div class="dinf">
                 <div class="dn">${esc(displayName(user))}${isMe?'<span class="metag">(deg)</span>':''} drakk ${esc(d.type_name)}${d.qty!==1?` ×${d.qty}`:''}</div>
-                <div class="dm">${fmtDate(d.ts)}${d.note?' · '+esc(d.note):''}</div>
+                <div class="dm">${fmtDate(d.ts)}${eventMeta(d)}${d.note?' · '+esc(d.note):''}</div>
             </div>
-            <div class="dr"><span class="dg">${formatAlcohol(d.grams)}</span></div>
+            <div class="dr">
+                <span class="dg">${formatAlcohol(d.grams)}</span>
+                ${isMe?`<button class="del del-txt" onclick="deleteDrink('${d.id}')">Slett</button>`:''}
+            </div>
         </div>
         ${interactions.ready?renderFeedReactions(d.id,reactions,reactionUsers,commentUsers,byUser):''}
         ${interactions.ready?renderFeedComments(comments,byUser):''}
@@ -153,7 +157,7 @@ function renderFeedReactions(drinkId,reactions,reactionUsers,commentUsers,usersB
     return `<div class="feed-actions">${FEED_REACTIONS.map(emoji=>{
         const stats=reactions[emoji]||{count:0,active:false};
         return `<button class="react-btn${stats.active?' active':''}" onclick="toggleFeedReaction('${drinkId}','${emoji}')">${emoji} ${stats.count||''}</button>`;
-    }).join('')}${hasInteractions?`<button class="react-detail-btn" onclick="toggleInteractionDetails('${drinkId}')">${openInteractionDetailsId===drinkId?'Skjul':'Hvem interagerte?'}</button>`:''}</div>
+    }).join('')}${hasInteractions?`<button class="react-detail-btn" onclick="toggleInteractionDetails('${drinkId}')">${openInteractionDetailsId===drinkId?'Skjul reaksjoner':'Reaksjoner'}</button>`:''}</div>
     ${openInteractionDetailsId===drinkId?renderInteractionDetails(reactionUsers,commentUsers,usersById):''}`;
 }
 
@@ -235,8 +239,24 @@ async function toggleFeedReaction(drinkId,emoji) {
 }
 
 async function deleteDrink(id) {
-    if (!confirm('Slett dette innlegget?')) return;
-    await sb.from('pl_drinks').delete().eq('id',id);
+    if (!confirm('Slett denne registreringen? Achievements, streaks, feed og statistikk oppdateres automatisk.')) return;
+    setLoading(true,'Sletter registrering…');
+    const {data,error}=await sb.from('pl_drinks').delete().eq('id',id).eq('user_id',CU.id).select('id');
+    setLoading(false);
+    if (error){showToast('Kunne ikke slette registreringen.',false);return;}
+    if (!data?.length){showToast('Fant ikke en egen registrering å slette.',false);return;}
     showToast('Slettet');
-    await renderDashboard();
+    await refreshAfterDrinkDelete();
+}
+
+async function refreshAfterDrinkDelete() {
+    const view=activeViewName();
+    if (view==='dashboard') { await renderDashboard(); return; }
+    if (view==='log') { await renderMyDrinksList(); return; }
+    if (view==='stats') { await renderStats(); return; }
+    if (view==='lb') { await fetchAndRenderLb(lbFilter); return; }
+    if (view==='achievements') { await renderAchievements(); return; }
+    if (view==='profile') { await renderAchievementProfile(achProfileUserId); return; }
+    if (view==='events') { await renderEvents(); return; }
+    await renderDrinkFeed();
 }

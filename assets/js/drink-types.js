@@ -118,8 +118,10 @@ async function handleAddDt() {
 async function deleteDt(id) {
     if (!confirm('Slett denne drikketypen?')) return;
     setLoading(true,'Sletter…');
-    await sb.from('pl_drink_types').delete().eq('id',id);
+    const {data,error}=await sb.from('pl_drink_types').delete().eq('id',id).eq('created_by',CU.id).select('id');
     setLoading(false);
+    if (error){showToast('Kunne ikke slette drikketypen.',false);return;}
+    if (!data?.length){showToast('Du kan bare slette egne drikketyper.',false);return;}
     dtCache=null; await renderDtList(); await populateLogSelect();
     showToast('Slettet');
 }
@@ -140,7 +142,7 @@ async function renderDtList() {
                 <div class="dtn">${t.name}</div>
                 <div class="dtm">${meta} · ${t.abv}% · <strong style="color:var(--accent)">${formatAlcohol(g)}</strong> per enhet</div>
             </div>
-            ${t.isDefault?'<span class="badge">Standard</span>':`<button class="btn btn-d btn-sm" onclick="deleteDt('${t.id}')">Slett</button>`}
+            ${t.isDefault?'<span class="badge">Standard</span>':t.created_by===CU.id?`<button class="btn btn-d btn-sm" onclick="deleteDt('${t.id}')">Slett</button>`:'<span class="badge">Felles</span>'}
         </div>`;
     }).join('');
 }

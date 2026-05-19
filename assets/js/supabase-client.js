@@ -7,6 +7,10 @@ let CU  = null;  // current user
 let lbChannel = null;
 let feedChannel = null;
 let dtCache   = null;
+let eventChannel = null;
+let eventCache = [];
+let eventSchemaReady = true;
+let currentEventId = localStorage.getItem('pl_event_filter') || '';
 
 function initSupabase(anonKey) {
     sb = createClient(SUPABASE_URL, anonKey);
