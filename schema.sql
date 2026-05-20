@@ -49,8 +49,12 @@ CREATE TABLE IF NOT EXISTS public.pl_events (
     code        TEXT        NOT NULL,
     code_lc     TEXT        UNIQUE NOT NULL,
     created_by  UUID        REFERENCES public.pl_users(id) ON DELETE SET NULL,
-    created_at  TIMESTAMPTZ DEFAULT NOW()
+    created_at  TIMESTAMPTZ DEFAULT NOW(),
+    ended_at    TIMESTAMPTZ
 );
+
+ALTER TABLE public.pl_events
+    ADD COLUMN IF NOT EXISTS ended_at TIMESTAMPTZ;
 
 CREATE TABLE IF NOT EXISTS public.pl_event_members (
     event_id    UUID        NOT NULL REFERENCES public.pl_events(id) ON DELETE CASCADE,
