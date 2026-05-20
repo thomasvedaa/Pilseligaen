@@ -34,6 +34,7 @@ const DEFAULT_DTYPES = [
     { id:'d7', name:'Shot / brennevin (40%)',vol_ml:40,  abv:40.0, isDefault:true },
     { id:'d8', name:'Sekser Pils 0,5L (4,7%)',vol_ml:3000, abv:4.7, isDefault:true, pack_count:6, unit_vol_ml:500 },
     { id:'d9', name:'10-pakning Pils 0,33L (4,7%)',vol_ml:3300, abv:4.7, isDefault:true, pack_count:10, unit_vol_ml:330 },
+    { id:'d10', name:'Guinness 0,5L (4,2%)',  vol_ml:500, abv:4.2, isDefault:true },
 ];
 
 function grams(vol, abv, qty = 1) { return Math.round(vol * (abv / 100) * 0.789 * qty * 10) / 10; }
