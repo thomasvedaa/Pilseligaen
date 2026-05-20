@@ -4,28 +4,119 @@
 const FEED_REACTIONS = ['🔥','😂','👏','💀','🍺'];
 let openInteractionDetailsId = null;
 
+function renderBeerGlassHtml(totalGrams, maxGrams, name, sublabel, lastGrams) {
+    const rawPct = maxGrams > 0 ? totalGrams / maxGrams : 0;
+    const fillPct = Math.min(Math.round(rawPct * 100), 100);
+    const overflowing = rawPct > 1;
+    const hasBeer = rawPct > 0.02;
+
+    const bubbleDefs = [
+        [3, 22, 10, 0.0,  2.4],
+        [2, 48, 25, 0.7,  3.0],
+        [4, 65, 15, 1.3,  2.2],
+        [2, 35, 40, 0.4,  3.4],
+        [3, 78, 20, 1.9,  2.7],
+        [2, 18, 55, 0.9,  3.1],
+        [4, 54, 35, 2.2,  2.0],
+        [3, 40,  8, 1.1,  2.8],
+        [2, 70, 48, 1.6,  3.3],
+        [3, 30, 62, 0.5,  2.5],
+        [2, 58, 72, 2.4,  2.9],
+        [4, 45, 55, 0.2,  3.6],
+    ];
+    const bubbles = hasBeer ? bubbleDefs.map(([sz,l,b,delay,dur]) =>
+        `<span class="beer-bubble" style="width:${sz}px;height:${sz}px;left:${l}%;bottom:${b}%;animation-delay:${delay}s;animation-duration:${dur}s"></span>`
+    ).join('') : '';
+
+    const prevLabel = lastGrams > 0
+        ? `<div class="beer-prev-label">Forrige: ${formatAlcohol(lastGrams)}</div>`
+        : `<div class="beer-prev-label" style="visibility:hidden">–</div>`;
+
+    return `<div class="beer-glass-item">
+        ${prevLabel}
+        <div class="beer-glass-outer">
+            <div class="beer-glass-body">
+                <div class="beer-fill-stack" data-fill="${fillPct}">
+                    ${hasBeer ? '<div class="beer-foam-band"></div>' : ''}
+                    ${bubbles}
+                </div>
+            </div>
+            <svg class="beer-glass-svg" viewBox="0 0 100 140" preserveAspectRatio="none" aria-hidden="true">
+                <path d="M13,1 L87,1 L73,139 L27,139 Z" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
+            ${overflowing ? '<div class="beer-drip-left"></div><div class="beer-drip-right"></div>' : ''}
+            ${overflowing ? '<div class="beer-puddle"></div>' : ''}
+        </div>
+        <div class="beer-glass-label">
+            <div class="beer-label-total">${formatAlcohol(totalGrams)}</div>
+            <div class="beer-label-name">${esc(name)}</div>
+            <div class="beer-label-scope">${esc(sublabel)}</div>
+        </div>
+    </div>`;
+}
+
+function animateBeerGlass() {
+    document.querySelectorAll('.beer-fill-stack').forEach(stack => {
+        const target = Math.min(parseInt(stack.dataset.fill) || 0, 100) + '%';
+        stack.style.height = '0%';
+        requestAnimationFrame(() => requestAnimationFrame(() => { stack.style.height = target; }));
+    });
+}
+
 async function renderDashboard() {
     document.getElementById('dash-stats').innerHTML='';
     document.getElementById('recent-drinks').innerHTML='<div class="vload"><div class="spinner"></div>Laster…</div>';
     document.getElementById('drink-feed').innerHTML='<div class="vload"><div class="spinner"></div>Laster…</div>';
     ensureFeedRealtime();
     renderDrinkFeed();
-    const {data:drinks,error}=await sb.from('pl_drinks').select('*').eq('user_id',CU.id);
+
+    const [{data:allDrinks,error},{data:allUsers}] = await Promise.all([
+        sb.from('pl_drinks').select('*'),
+        sb.from('pl_users').select(PROFILE_SELECT)
+    ]);
     if (error){document.getElementById('recent-drinks').innerHTML=`<div class="empty">Feil: ${error.message}</div>`;return;}
-    const all=visibleDrinksForScope(drinks||[]);
-    const now=new Date();
-    const wkS=new Date(now); wkS.setDate(now.getDate()-(now.getDay()===0?6:now.getDay()-1)); wkS.setHours(0,0,0,0);
-    const mS=new Date(now.getFullYear(),now.getMonth(),1);
-    const wkG=all.filter(d=>new Date(d.ts)>=wkS).reduce((s,d)=>s+d.grams,0);
-    const mG =all.filter(d=>new Date(d.ts)>=mS ).reduce((s,d)=>s+d.grams,0);
-    const tot=all.reduce((s,d)=>s+d.grams,0);
-    const days=new Set(all.map(d=>new Date(d.ts).toDateString())).size;
-    document.getElementById('dash-stats').innerHTML=`
-        <div class="card"><div class="ct">Denne uken</div><div class="cv">${formatAlcoholValue(wkG)}</div><div class="cs">${alcoholSubLabel()}</div></div>
-        <div class="card"><div class="ct">Denne måneden</div><div class="cv">${formatAlcoholValue(mG)}</div><div class="cs">${alcoholSubLabel()}</div></div>
-        <div class="card"><div class="ct">Totalt</div><div class="cv">${formatAlcoholValue(tot)}</div><div class="cs">${days} drikkedager · ${alcoholSubLabel()}</div></div>`;
-    const recent=[...all].sort((a,b)=>new Date(b.ts)-new Date(a.ts)).slice(0,12);
-    const el=document.getElementById('recent-drinks');
+
+    const scopeUsers = await fetchUsersForCurrentScope(allUsers||[]);
+    const scopeUserIds = new Set(scopeUsers.map(u=>u.id));
+    const myProfile = (allUsers||[]).find(u=>u.id===CU.id) || {username:'Meg'};
+    const now = new Date();
+
+    let currentDrinks, lastDrinks, sublabel;
+    if (currentEventId) {
+        currentDrinks = visibleDrinksForScope(allDrinks||[]);
+        lastDrinks = [];
+        sublabel = eventLabel();
+    } else {
+        const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastMonthStart = new Date(now.getFullYear(), now.getMonth()-1, 1);
+        const scoped = visibleDrinksForScope(allDrinks||[]);
+        currentDrinks = scoped.filter(d => new Date(d.ts) >= thisMonthStart);
+        lastDrinks = scoped.filter(d => {
+            const t = new Date(d.ts);
+            return t >= lastMonthStart && t < thisMonthStart;
+        });
+        sublabel = 'Denne måneden';
+    }
+
+    const sumUser = (arr, uid) => arr.filter(d=>scopeUserIds.has(d.user_id)&&(uid?d.user_id===uid:true)).reduce((s,d)=>s+d.grams,0);
+    const myNow    = sumUser(currentDrinks, CU.id);
+    const groupNow = sumUser(currentDrinks, null);
+    const monthFloor = 12 * ALCOHOL_UNIT_GRAMS;
+    const myLast   = currentEventId ? 100 : Math.max(sumUser(lastDrinks, CU.id), monthFloor);
+    const groupLast= currentEventId ? Math.max(100, scopeUsers.length*100) : Math.max(sumUser(lastDrinks, null), scopeUsers.length * monthFloor);
+
+    const myLastDisplay    = currentEventId ? 0 : sumUser(lastDrinks, CU.id);
+    const groupLastDisplay = currentEventId ? 0 : sumUser(lastDrinks, null);
+
+    document.getElementById('dash-stats').innerHTML = `<div class="beer-glass-pair">
+        ${renderBeerGlassHtml(myNow,    myLast,    displayName(myProfile), sublabel, myLastDisplay)}
+        ${renderBeerGlassHtml(groupNow, groupLast, 'Gruppen',              sublabel, groupLastDisplay)}
+    </div>`;
+    animateBeerGlass();
+
+    const myDrinks = visibleDrinksForScope((allDrinks||[]).filter(d=>d.user_id===CU.id));
+    const recent = [...myDrinks].sort((a,b)=>new Date(b.ts)-new Date(a.ts)).slice(0,12);
+    const el = document.getElementById('recent-drinks');
     if (!recent.length){el.innerHTML='<div class="empty">Ingen drikke registrert ennå.<br>Trykk <strong>➕ Registrer</strong> for å starte!</div>';return;}
     el.innerHTML=recent.map(d=>`
         <div class="di">
