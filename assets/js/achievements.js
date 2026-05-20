@@ -27,6 +27,11 @@ const ACHIEVEMENTS = [
     {id:'wine50', icon:'🍷', name:'Vinmester', desc:'Totalt 50 liter vin registrert.', check:s=>s.liters.wine>=50, progress:s=>`${fmtLiters(Math.min(s.liters.wine,50))}/50 L`},
     {id:'spirits1', icon:'🥃', name:'Spritsertifikat', desc:'Totalt 1 liter sprit registrert.', check:s=>s.liters.spirits>=1, progress:s=>`${fmtLiters(Math.min(s.liters.spirits,1))}/1 L`},
     {id:'spirits10', icon:'🥃', name:'Spritsertifikat', desc:'Totalt 10 liter sprit registrert.', check:s=>s.liters.spirits>=10, progress:s=>`${fmtLiters(Math.min(s.liters.spirits,10))}/10 L`},
+    {id:'split_the_g', icon:'🍀', name:'Split the G', desc:'Drakk din første Guinness.', check:s=>s.guinnessCount>=1, progress:s=>`${Math.min(s.guinnessCount,1)}/1`},
+    {id:'g_spot', icon:'🎯', name:'Finding th G spot?', desc:'100 Guinness drukket.', check:s=>s.guinnessCount>=100, progress:s=>`${Math.min(s.guinnessCount,100)}/100`},
+    {id:'tur_konge', icon:'👑', name:'Tur konge', desc:'Drakk mest på en gruppetur da turen ble avsluttet.', check:s=>s.turKongeWins>=1, progress:s=>s.turKongeWins>=1?`${s.turKongeWins} turer`:'0/1'},
+    {id:'edru_sjafor', icon:'🚗', name:'Edru sjåfør', desc:'Drakk minst (men noe) på en avsluttet tur med 3+ deltakere.', check:s=>s.edruSjaforWins>=1, progress:s=>s.edruSjaforWins>=1?`${s.edruSjaforWins} turer`:'0/1'},
+    {id:'legendary_pull', icon:'⚡', name:'Legendary pull', desc:'Drakk en energiøl. Reinheitsgebot RIP.', check:s=>s.hasEnergyBeer, progress:s=>s.hasEnergyBeer?'Klar':'0/1'},
 
 ];
 
@@ -96,7 +101,7 @@ function streakStats(days) {
     return {current,best,active,last};
 }
 
-function summarizeAchievements(user,drinks) {
+function summarizeAchievements(user,drinks,extra={}) {
     const sorted=[...drinks].sort((a,b)=>new Date(a.ts)-new Date(b.ts));
     const totalGrams=sorted.reduce((sum,d)=>sum+(Number(d.grams)||0),0);
     const totalUnits=totalGrams/ALCOHOL_UNIT_GRAMS;
@@ -113,6 +118,8 @@ function summarizeAchievements(user,drinks) {
     let hasMorning=false;
     let hasLateNight=false;
     let hasComeback=false;
+    let guinnessCount=0;
+    let hasEnergyBeer=false;
 
     sorted.forEach((d,i)=>{
         const k=dayKey(d.ts);
@@ -129,6 +136,8 @@ function summarizeAchievements(user,drinks) {
 
         const txt=`${d.type_name||''} ${d.note||''}`.toLowerCase();
         if (/(chilli|chili|klaus)/.test(txt)) hasChilli=true;
+        if (/guinness/.test(txt)) guinnessCount+=Number(d.qty)||1;
+        if (/energi[øo]l/.test(txt)) hasEnergyBeer=true;
 
         const hour=new Date(d.ts).getHours();
         if (hour>=6 && hour<7) hasMorning=true;
@@ -170,7 +179,11 @@ function summarizeAchievements(user,drinks) {
         hasWeekendRun,
         hasAllCategoriesDay,
         maxMonthDays,
-        maxMonthBeerLiters
+        maxMonthBeerLiters,
+        guinnessCount,
+        hasEnergyBeer,
+        turKongeWins:extra.turKongeWins||0,
+        edruSjaforWins:extra.edruSjaforWins||0
     }));
 
     return {
@@ -198,6 +211,10 @@ function summarizeAchievements(user,drinks) {
         hasAllCategoriesDay,
         maxMonthDays,
         maxMonthBeerLiters,
+        guinnessCount,
+        hasEnergyBeer,
+        turKongeWins:extra.turKongeWins||0,
+        edruSjaforWins:extra.edruSjaforWins||0,
         unlockedCount:unlocked.length
     };
 }
@@ -216,6 +233,7 @@ function achievementUnlockEvents(user,drinks) {
     let totalGrams=0;
     let lastDay=null;
     let dayRun=0;
+    let guinnessCount=0;
 
     const unlock=(id,drink)=>{
         if (unlocked.has(id)) return;
@@ -276,6 +294,12 @@ function achievementUnlockEvents(user,drinks) {
 
         const txt=`${d.type_name||''} ${d.note||''}`.toLowerCase();
         if (/(chilli|chili|klaus)/.test(txt)) unlock('chilli_klaus',d);
+        if (/guinness/.test(txt)) {
+            guinnessCount+=Number(d.qty)||1;
+            if (guinnessCount>=1) unlock('split_the_g',d);
+            if (guinnessCount>=100) unlock('g_spot',d);
+        }
+        if (/energi[øo]l/.test(txt)) unlock('legendary_pull',d);
 
         const hour=new Date(d.ts).getHours();
         if (hour>=6 && hour<7) unlock('morningbird',d);
@@ -314,21 +338,68 @@ function achievementUnlockStats(summaries) {
 }
 
 async function loadAchievementData() {
-    const [{data:users,error:userError},{data:drinks,error:drinkError}]=await Promise.all([
+    const [
+        {data:users,error:userError},
+        {data:drinks,error:drinkError},
+        endedEventsRes,
+        membersRes
+    ]=await Promise.all([
         sb.from('pl_users').select(PROFILE_SELECT),
-        sb.from('pl_drinks').select('*')
+        sb.from('pl_drinks').select('*'),
+        sb.from('pl_events').select('*').not('ended_at','is',null),
+        sb.from('pl_event_members').select('event_id,user_id')
     ]);
     if (userError || drinkError) return {error:userError||drinkError};
+
+    const tripStandings=computeTripStandings(endedEventsRes?.data||[],membersRes?.data||[],drinks||[]);
 
     const scopeUsers=await fetchUsersForCurrentScope(users||[]);
     const scopeDrinks=visibleDrinksForScope(drinks||[]);
     const drinksByUser={};
     scopeDrinks.forEach(d=>{(drinksByUser[d.user_id] ||= []).push(d);});
     const summaries=scopeUsers
-        .map(u=>summarizeAchievements(u,drinksByUser[u.id]||[]))
+        .map(u=>summarizeAchievements(u,drinksByUser[u.id]||[],{
+            turKongeWins:tripStandings.turKonge[u.id]||0,
+            edruSjaforWins:tripStandings.edruSjafor[u.id]||0
+        }))
         .sort((a,b)=>b.unlockedCount-a.unlockedCount || b.bestStreak-a.bestStreak || displayName(a.user).localeCompare(displayName(b.user),'no'));
 
     return {users:scopeUsers,drinks:scopeDrinks,summaries,unlockStats:achievementUnlockStats(summaries)};
+}
+
+function computeTripStandings(endedEvents,members,drinks) {
+    const turKonge={};
+    const edruSjafor={};
+    if (!endedEvents.length) return {turKonge,edruSjafor};
+    const membersByEvent={};
+    members.forEach(m=>{(membersByEvent[m.event_id] ||= new Set()).add(m.user_id);});
+    endedEvents.forEach(ev=>{
+        const memberSet=membersByEvent[ev.id]||new Set();
+        if (memberSet.size<2) return;
+        const endedAt=new Date(ev.ended_at);
+        const gramsBy={};
+        drinks.forEach(d=>{
+            if (d.event_id!==ev.id) return;
+            if (new Date(d.ts)>endedAt) return;
+            if (!memberSet.has(d.user_id)) return;
+            gramsBy[d.user_id]=(gramsBy[d.user_id]||0)+(Number(d.grams)||0);
+        });
+        const entries=Object.entries(gramsBy).filter(([,g])=>g>0);
+        if (!entries.length) return;
+        const max=Math.max(...entries.map(([,g])=>g));
+        entries.filter(([,g])=>g===max).forEach(([uid])=>{
+            turKonge[uid]=(turKonge[uid]||0)+1;
+        });
+        if (memberSet.size>=3 && entries.length>=2) {
+            const min=Math.min(...entries.map(([,g])=>g));
+            if (min<max) {
+                entries.filter(([,g])=>g===min).forEach(([uid])=>{
+                    edruSjafor[uid]=(edruSjafor[uid]||0)+1;
+                });
+            }
+        }
+    });
+    return {turKonge,edruSjafor};
 }
 
 function renderStreakBadge(summary) {
@@ -424,6 +495,7 @@ async function renderAchievements() {
         achChannel=sb.channel('achievements-realtime')
             .on('postgres_changes',{event:'*',schema:'public',table:'pl_drinks'},()=>refreshActiveAchievementView())
             .on('postgres_changes',{event:'*',schema:'public',table:'pl_users'},()=>refreshActiveAchievementView())
+            .on('postgres_changes',{event:'*',schema:'public',table:'pl_events'},()=>refreshActiveAchievementView())
             .subscribe();
     }
 

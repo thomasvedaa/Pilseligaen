@@ -48,17 +48,29 @@ function ensureFeedRealtime() {
         .on('postgres_changes',{event:'*',schema:'public',table:'pl_users'},()=>renderDashboard())
         .on('postgres_changes',{event:'*',schema:'public',table:'pl_drink_comments'},()=>renderDrinkFeed())
         .on('postgres_changes',{event:'*',schema:'public',table:'pl_drink_reactions'},()=>renderDrinkFeed())
+        .on('postgres_changes',{event:'*',schema:'public',table:'pl_achievement_reactions'},()=>renderDrinkFeed())
+        .on('postgres_changes',{event:'*',schema:'public',table:'pl_achievement_comments'},()=>renderDrinkFeed())
         .subscribe();
 }
 
-async function fetchFeedInteractions(drinkIds) {
-    const blank={ready:true,commentsByDrink:{},commentUsersByDrink:{},reactionsByDrink:{},reactionUsersByDrink:{},myReactions:{}};
-    if (!drinkIds.length) return blank;
+async function fetchFeedInteractions(drinkIds,achievementIds=[]) {
+    const blank={ready:true,commentsByDrink:{},commentUsersByDrink:{},reactionsByDrink:{},reactionUsersByDrink:{},commentsByAchievement:{},commentUsersByAchievement:{},reactionsByAchievement:{},reactionUsersByAchievement:{},myReactions:{}};
+    if (!drinkIds.length && !achievementIds.length) return blank;
 
-    const [commentsRes,reactionsRes] = await Promise.all([
-        sb.from('pl_drink_comments').select('id,drink_id,user_id,body,created_at').in('drink_id',drinkIds).order('created_at',{ascending:true}),
-        sb.from('pl_drink_reactions').select('id,drink_id,user_id,emoji').in('drink_id',drinkIds)
-    ]);
+    const commentsP=drinkIds.length
+        ? sb.from('pl_drink_comments').select('id,drink_id,user_id,body,created_at').in('drink_id',drinkIds).order('created_at',{ascending:true})
+        : Promise.resolve({data:[],error:null});
+    const drinkReactionsP=drinkIds.length
+        ? sb.from('pl_drink_reactions').select('id,drink_id,user_id,emoji').in('drink_id',drinkIds)
+        : Promise.resolve({data:[],error:null});
+    const achReactionsP=achievementIds.length
+        ? sb.from('pl_achievement_reactions').select('id,achievement_id,user_id,emoji').in('achievement_id',achievementIds)
+        : Promise.resolve({data:[],error:null});
+    const achCommentsP=achievementIds.length
+        ? sb.from('pl_achievement_comments').select('id,achievement_id,user_id,body,created_at').in('achievement_id',achievementIds).order('created_at',{ascending:true})
+        : Promise.resolve({data:[],error:null});
+
+    const [commentsRes,reactionsRes,achReactionsRes,achCommentsRes]=await Promise.all([commentsP,drinkReactionsP,achReactionsP,achCommentsP]);
 
     if (commentsRes.error || reactionsRes.error) {
         return {...blank,ready:false};
@@ -82,6 +94,25 @@ async function fetchFeedInteractions(drinkIds) {
         }
     });
 
+    if (!achReactionsRes.error) {
+        (achReactionsRes.data||[]).forEach(r=>{
+            const reactions=(blank.reactionsByAchievement[r.achievement_id] ||= {});
+            const stats=(reactions[r.emoji] ||= {count:0,active:false});
+            stats.count++;
+            const users=(blank.reactionUsersByAchievement[r.achievement_id] ||= {});
+            (users[r.emoji] ||= []).push(r.user_id);
+            if (r.user_id===CU.id) stats.active=true;
+        });
+    }
+
+    if (!achCommentsRes.error) {
+        (achCommentsRes.data||[]).forEach(c=>{
+            (blank.commentsByAchievement[c.achievement_id] ||= []).push(c);
+            const commenters=(blank.commentUsersByAchievement[c.achievement_id] ||= []);
+            if (!commenters.includes(c.user_id)) commenters.push(c.user_id);
+        });
+    }
+
     return blank;
 }
 
@@ -102,11 +133,12 @@ async function renderDrinkFeed() {
     const feed=[...drinkEvents,...achEvents].sort((a,b)=>new Date(b.ts)-new Date(a.ts)).slice(0,30);
     if (!feed.length){el.innerHTML='<div class="empty">Ingen aktivitet ennå.</div>';return;}
     const drinkIds=feed.filter(e=>e.kind==='drink').map(e=>e.drink.id);
-    const interactions=await fetchFeedInteractions(drinkIds);
+    const achievementIds=feed.filter(e=>e.kind==='achievement').map(e=>e.id);
+    const interactions=await fetchFeedInteractions(drinkIds,achievementIds);
 
     const schemaNotice=interactions.ready?'':'<div class="feed-disabled global">Kjør oppdatert schema.sql for å aktivere kommentarer og reaksjoner.</div>';
     el.innerHTML=schemaNotice+feed.map(e=>e.kind==='achievement'
-        ? renderAchievementFeedItem(e,byUser)
+        ? renderAchievementFeedItem(e,byUser,interactions)
         : renderDrinkFeedItem(e.drink,interactions,byUser)
     ).join('');
 }
@@ -136,9 +168,13 @@ function renderDrinkFeedItem(d,interactions,byUser) {
     </div>`;
 }
 
-function renderAchievementFeedItem(event,byUser) {
+function renderAchievementFeedItem(event,byUser,interactions) {
     const user=byUser[event.user_id]||event.user||{username:'Ukjent',color:USER_COLORS[0]};
     const isMe=event.user_id===CU.id;
+    const reactions=interactions?.reactionsByAchievement?.[event.id]||{};
+    const reactionUsers=interactions?.reactionUsersByAchievement?.[event.id]||{};
+    const comments=interactions?.commentsByAchievement?.[event.id]||[];
+    const commentUsers=interactions?.commentUsersByAchievement?.[event.id]||[];
     return `<div class="feed-item achievement">
         <div class="feed-head">
             ${avatarHtml(user,30,'.78em')}
@@ -148,7 +184,78 @@ function renderAchievementFeedItem(event,byUser) {
             </div>
             <div class="dr"><span class="dg">🏅</span></div>
         </div>
+        ${interactions?.ready?renderAchievementReactions(event.id,reactions,reactionUsers,commentUsers,byUser):''}
+        ${interactions?.ready?renderAchievementComments(comments,byUser):''}
+        ${interactions?.ready?renderAchievementCommentForm(event.id):''}
     </div>`;
+}
+
+function renderAchievementReactions(achId,reactions,reactionUsers,commentUsers,usersById) {
+    const total=Object.values(reactions).reduce((sum,r)=>sum+(r.count||0),0);
+    const hasInteractions=total>0 || commentUsers.length>0;
+    const detailsId=`ach:${achId}`;
+    const safeId=esc(achId);
+    return `<div class="feed-actions">${FEED_REACTIONS.map(emoji=>{
+        const stats=reactions[emoji]||{count:0,active:false};
+        return `<button class="react-btn${stats.active?' active':''}" onclick="toggleAchievementReaction('${safeId}','${emoji}')">${emoji} ${stats.count||''}</button>`;
+    }).join('')}${hasInteractions?`<button class="react-detail-btn" onclick="toggleInteractionDetails('${detailsId}')">${openInteractionDetailsId===detailsId?'Skjul reaksjoner':'Reaksjoner'}</button>`:''}</div>
+    ${openInteractionDetailsId===detailsId?renderInteractionDetails(reactionUsers,commentUsers,usersById):''}`;
+}
+
+function renderAchievementComments(comments,usersById) {
+    if (!comments.length) return '<div class="feed-comments"></div>';
+    return `<div class="feed-comments">${comments.map(c=>{
+        const user=usersById[c.user_id]||{username:'Ukjent'};
+        const canDelete=c.user_id===CU.id;
+        return `<div class="feed-comment">
+            <div class="feed-comment-meta">
+                <span>${esc(displayName(user))} · ${fmtDate(c.created_at)}</span>
+                ${canDelete?`<button class="del" onclick="deleteAchievementComment('${c.id}')">✕</button>`:''}
+            </div>
+            <div>${esc(c.body)}</div>
+        </div>`;
+    }).join('')}</div>`;
+}
+
+function renderAchievementCommentForm(achId) {
+    const safeId=esc(achId);
+    const inputId=`feed-comment-ach-${achId.replace(/[^a-zA-Z0-9_-]/g,'_')}`;
+    return `<div class="feed-comment-form">
+        <input id="${inputId}" maxlength="240" placeholder="Skriv kommentar…" onkeydown="if(event.key==='Enter') addAchievementComment('${safeId}','${inputId}')">
+        <button class="btn btn-s" onclick="addAchievementComment('${safeId}','${inputId}')">Send</button>
+    </div>`;
+}
+
+async function addAchievementComment(achId,inputId) {
+    const input=document.getElementById(inputId);
+    const body=input?.value.trim();
+    if (!body) return;
+    const {error}=await sb.from('pl_achievement_comments').insert({achievement_id:achId,user_id:CU.id,body});
+    if (error){showToast('Kjør oppdatert schema.sql for kommentarer.',false);return;}
+    input.value='';
+    await renderDrinkFeed();
+}
+
+async function deleteAchievementComment(id) {
+    const {error}=await sb.from('pl_achievement_comments').delete().eq('id',id).eq('user_id',CU.id);
+    if (error){showToast('Kunne ikke slette kommentar.',false);return;}
+    await renderDrinkFeed();
+}
+
+async function toggleAchievementReaction(achId,emoji) {
+    const {data:existing,error:findError}=await sb.from('pl_achievement_reactions')
+        .select('id')
+        .eq('achievement_id',achId)
+        .eq('user_id',CU.id)
+        .eq('emoji',emoji)
+        .maybeSingle();
+    if (findError){showToast('Kjør oppdatert schema.sql for reaksjoner.',false);return;}
+
+    const result=existing
+        ? await sb.from('pl_achievement_reactions').delete().eq('id',existing.id)
+        : await sb.from('pl_achievement_reactions').insert({achievement_id:achId,user_id:CU.id,emoji});
+    if (result.error){showToast('Kunne ikke lagre reaksjon.',false);return;}
+    await renderDrinkFeed();
 }
 
 function renderFeedReactions(drinkId,reactions,reactionUsers,commentUsers,usersById) {

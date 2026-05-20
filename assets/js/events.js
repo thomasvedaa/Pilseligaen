@@ -186,6 +186,11 @@ async function joinEventByCode() {
         showToast(error?.message||'Fant ingen tur med den koden.',false);
         return;
     }
+    if (event.ended_at) {
+        setLoading(false);
+        showToast('Turen er avsluttet.',false);
+        return;
+    }
 
     setLoading(false);
 
@@ -201,6 +206,21 @@ async function copyEventCode(code) {
     } catch {
         prompt('Kopier koden:',code);
     }
+}
+
+async function endTrip(eventId) {
+    const event=eventById(eventId);
+    if (!event) return;
+    if (event.created_by!==CU.id) {showToast('Bare turlederen kan avslutte turen.',false);return;}
+    if (event.ended_at) {showToast('Turen er allerede avsluttet.',false);return;}
+    if (!confirm(`Avslutte "${event.name}"? Den med mest alkohol kåres til Tur konge.`)) return;
+    setLoading(true,'Avslutter tur...');
+    const {error}=await sb.from('pl_events').update({ended_at:new Date().toISOString()}).eq('id',eventId);
+    setLoading(false);
+    if (error) {showToast('Kunne ikke avslutte turen.',false);return;}
+    await loadEvents();
+    await refreshActiveScope();
+    showToast('Tur avsluttet 👑');
 }
 
 async function fetchUsersForCurrentScope(users) {
@@ -271,17 +291,22 @@ async function renderEvents() {
     }
 
     const eventStats=await loadEventLeaderStats();
-    el.innerHTML=eventCache.map(e=>`
-        <div class="event-card${e.id===currentEventId?' active':''}">
+    el.innerHTML=eventCache.map(e=>{
+        const ended=!!e.ended_at;
+        const canEnd=!ended && e.created_by===CU.id;
+        const endedMeta=ended?` · <span class="badge">Avsluttet ${fmtDate(e.ended_at)}</span>`:'';
+        return `
+        <div class="event-card${e.id===currentEventId?' active':''}${ended?' ended':''}">
             <div class="event-main">
                 <div class="event-name">${esc(e.name)}</div>
-                <div class="event-meta">Kode <strong>${esc(e.code)}</strong> · ${e.member_count||1} ${e.member_count===1?'person':'personer'}</div>
+                <div class="event-meta">Kode <strong>${esc(e.code)}</strong> · ${e.member_count||1} ${e.member_count===1?'person':'personer'}${endedMeta}</div>
                 ${renderEventLeaderLine(eventStats[e.id])}
             </div>
             <div class="event-actions">
                 <button class="icon-btn" onclick="copyEventCode('${esc(e.code)}')">Kopier kode</button>
+                ${canEnd?`<button class="btn btn-d btn-sm" onclick="endTrip('${e.id}')">Avslutt tur</button>`:''}
                 <button class="btn btn-p btn-sm" onclick="activateEvent('${e.id}')">${e.id===currentEventId?'Aktiv':'Vis'}</button>
             </div>
         </div>
-    `).join('');
+    `;}).join('');
 }
