@@ -75,11 +75,13 @@ CREATE TABLE IF NOT EXISTS public.pl_drinks (
     grams       NUMERIC     NOT NULL,           -- gram alkohol (vol_ml * abv/100 * 0.789 * qty)
     ts          TIMESTAMPTZ NOT NULL,            -- tidspunkt for drikken
     note        TEXT        DEFAULT '',
+    location_city TEXT,
     created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
 ALTER TABLE public.pl_drinks
-    ADD COLUMN IF NOT EXISTS event_id UUID REFERENCES public.pl_events(id) ON DELETE SET NULL;
+    ADD COLUMN IF NOT EXISTS event_id UUID REFERENCES public.pl_events(id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS location_city TEXT;
 
 -- ── FEED-KOMMENTARER ──────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.pl_drink_comments (
@@ -308,6 +310,7 @@ GRANT UPDATE (nickname,avatar_url,color) ON public.pl_users TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.pl_drink_types TO authenticated;
 GRANT SELECT ON public.pl_events TO authenticated;
 GRANT UPDATE (ended_at) ON public.pl_events TO authenticated;
+GRANT DELETE ON public.pl_events TO authenticated;
 GRANT SELECT ON public.pl_event_members TO authenticated;
 GRANT SELECT, INSERT, DELETE ON public.pl_drinks TO authenticated;
 GRANT SELECT, INSERT, DELETE ON public.pl_drink_comments TO authenticated;
@@ -346,6 +349,7 @@ DROP POLICY IF EXISTS "drink_types_update_self" ON public.pl_drink_types;
 DROP POLICY IF EXISTS "drink_types_delete_self" ON public.pl_drink_types;
 DROP POLICY IF EXISTS "events_select_members"     ON public.pl_events;
 DROP POLICY IF EXISTS "events_update_end_trip"    ON public.pl_events;
+DROP POLICY IF EXISTS "events_delete_created"     ON public.pl_events;
 DROP POLICY IF EXISTS "event_members_select_members" ON public.pl_event_members;
 DROP POLICY IF EXISTS "drinks_select_visible" ON public.pl_drinks;
 DROP POLICY IF EXISTS "drinks_insert_self" ON public.pl_drinks;
@@ -395,6 +399,10 @@ CREATE POLICY "events_update_end_trip"
     ON public.pl_events FOR UPDATE TO authenticated
     USING (created_by = public.current_profile_id())
     WITH CHECK (created_by = public.current_profile_id());
+
+CREATE POLICY "events_delete_created"
+    ON public.pl_events FOR DELETE TO authenticated
+    USING (created_by = public.current_profile_id());
 
 CREATE POLICY "event_members_select_members"
     ON public.pl_event_members FOR SELECT TO authenticated

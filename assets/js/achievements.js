@@ -23,14 +23,14 @@ const ACHIEVEMENTS = [
     {id:'beer50', icon:'🍻', name:'50 liter øl', desc:'Totalt 50 liter øl registrert.', check:s=>s.liters.beer>=50, progress:s=>`${fmtLiters(Math.min(s.liters.beer,50))}/50 L`},
     {id:'month_beer50', icon:'🍺', name:'Alkoholiker', desc:'50 liter øl i samme måned.', check:s=>s.maxMonthBeerLiters>=50, progress:s=>`${fmtLiters(Math.min(s.maxMonthBeerLiters,50))}/50 L`},
     {id:'month_beer100', icon:'🚨', name:'Du har et problem', desc:'100 liter øl i samme måned.', check:s=>s.maxMonthBeerLiters>=100, progress:s=>`${fmtLiters(Math.min(s.maxMonthBeerLiters,100))}/100 L`},
-    {id:'wine10', icon:'🍷', name:'Vinvenn', desc:'Totalt 10 liter vin registrert.', check:s=>s.liters.wine>=10, progress:s=>`${fmtLiters(Math.min(s.liters.wine,10))}/10 L`},
-    {id:'wine50', icon:'🍷', name:'Vinmester', desc:'Totalt 50 liter vin registrert.', check:s=>s.liters.wine>=50, progress:s=>`${fmtLiters(Math.min(s.liters.wine,50))}/50 L`},
-    {id:'spirits1', icon:'🥃', name:'Spritsertifikat', desc:'Totalt 1 liter sprit registrert.', check:s=>s.liters.spirits>=1, progress:s=>`${fmtLiters(Math.min(s.liters.spirits,1))}/1 L`},
-    {id:'spirits10', icon:'🥃', name:'Spritsertifikat', desc:'Totalt 10 liter sprit registrert.', check:s=>s.liters.spirits>=10, progress:s=>`${fmtLiters(Math.min(s.liters.spirits,10))}/10 L`},
+    {id:'wine10', icon:'🍷', name:'Somalier', desc:'Totalt 10 liter vin registrert.', check:s=>s.liters.wine>=10, progress:s=>`${fmtLiters(Math.min(s.liters.wine,10))}/10 L`},
+    {id:'wine50', icon:'🍷', name:'Sommelier', desc:'Totalt 50 liter vin registrert.', check:s=>s.liters.wine>=50, progress:s=>`${fmtLiters(Math.min(s.liters.wine,50))}/50 L`},
+    {id:'spirits1', icon:'🥃', name:'Vodka-visum', desc:'Totalt 1 liter sprit registrert.', check:s=>s.liters.spirits>=1, progress:s=>`${fmtLiters(Math.min(s.liters.spirits,1))}/1 L`},
+    {id:'spirits10', icon:'🥃', name:'Indre fred', desc:'Totalt 10 liter sprit registrert.', check:s=>s.liters.spirits>=10, progress:s=>`${fmtLiters(Math.min(s.liters.spirits,10))}/10 L`},
     {id:'split_the_g', icon:'🍀', name:'Split the G', desc:'Drakk din første Guinness.', check:s=>s.guinnessCount>=1, progress:s=>`${Math.min(s.guinnessCount,1)}/1`},
-    {id:'g_spot', icon:'🎯', name:'Finding th G spot?', desc:'100 Guinness drukket.', check:s=>s.guinnessCount>=100, progress:s=>`${Math.min(s.guinnessCount,100)}/100`},
+    {id:'g_spot', icon:'🎯', name:'Finding the G spot?', desc:'100 Guinness drukket.', check:s=>s.guinnessCount>=100, progress:s=>`${Math.min(s.guinnessCount,100)}/100`},
     {id:'tur_konge', icon:'👑', name:'Tur konge', desc:'Drakk mest på en gruppetur da turen ble avsluttet.', check:s=>s.turKongeWins>=1, progress:s=>s.turKongeWins>=1?`${s.turKongeWins} turer`:'0/1'},
-    {id:'edru_sjafor', icon:'🚗', name:'Edru sjåfør', desc:'Drakk minst (men noe) på en avsluttet tur med 3+ deltakere.', check:s=>s.edruSjaforWins>=1, progress:s=>s.edruSjaforWins>=1?`${s.edruSjaforWins} turer`:'0/1'},
+    {id:'edru_sjafor', icon:'🚗', name:'Edru sjåfør', desc:'Drakk minst på en avsluttet tur med 3+ deltakere.', check:s=>s.edruSjaforWins>=1, progress:s=>s.edruSjaforWins>=1?`${s.edruSjaforWins} turer`:'0/1'},
     {id:'legendary_pull', icon:'⚡', name:'Legendary pull', desc:'Drakk en energiøl. Reinheitsgebot RIP.', check:s=>s.hasEnergyBeer, progress:s=>s.hasEnergyBeer?'Klar':'0/1'},
 
 ];
@@ -246,6 +246,7 @@ function achievementUnlockEvents(user,drinks) {
             user_id:user.id,
             user,
             achievement,
+            event_id:drink.event_id||'',
             ts:drink.created_at||drink.ts,
             drink_ts:drink.ts
         });
@@ -353,8 +354,8 @@ async function loadAchievementData() {
 
     const tripStandings=computeTripStandings(endedEventsRes?.data||[],membersRes?.data||[],drinks||[]);
 
-    const scopeUsers=await fetchUsersForCurrentScope(users||[]);
-    const scopeDrinks=visibleDrinksForScope(drinks||[]);
+    const scopeUsers=users||[];
+    const scopeDrinks=drinks||[];
     const drinksByUser={};
     scopeDrinks.forEach(d=>{(drinksByUser[d.user_id] ||= []).push(d);});
     const summaries=scopeUsers

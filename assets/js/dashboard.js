@@ -32,7 +32,7 @@ async function renderDashboard() {
             <span class="dico">${drinkIcon(d.abv)}</span>
             <div class="dinf">
                 <div class="dn">${esc(d.type_name)}${d.qty!==1?` ×${d.qty}`:''}</div>
-                <div class="dm">${fmtDate(d.ts)}${eventMeta(d)}${d.note?' · '+esc(d.note):''}</div>
+                <div class="dm">${fmtDate(d.ts)}${eventMeta(d)}${drinkLocationMeta(d)}${d.note?' · '+esc(d.note):''}</div>
             </div>
             <div class="dr">
                 <span class="dg">${formatAlcohol(d.grams)}</span>
@@ -127,9 +127,11 @@ async function renderDrinkFeed() {
     const scopeUsers=await fetchUsersForCurrentScope(users||[]);
     const byUser={};
     (users||[]).forEach(u=>{byUser[u.id]=u;});
-    const allDrinks=visibleDrinksForScope(drinks||[]);
+    const allVisibleDrinks=drinks||[];
+    const allDrinks=visibleDrinksForScope(allVisibleDrinks);
     const drinkEvents=allDrinks.map(d=>({id:`drink:${d.id}`,kind:'drink',ts:d.ts,drink:d}));
-    const achEvents=typeof achievementFeedEvents==='function' ? achievementFeedEvents(scopeUsers,allDrinks) : [];
+    const allAchievementEvents=typeof achievementFeedEvents==='function' ? achievementFeedEvents(scopeUsers,allVisibleDrinks) : [];
+    const achEvents=currentEventId ? allAchievementEvents.filter(e=>e.event_id===currentEventId) : allAchievementEvents;
     const feed=[...drinkEvents,...achEvents].sort((a,b)=>new Date(b.ts)-new Date(a.ts)).slice(0,30);
     if (!feed.length){el.innerHTML='<div class="empty">Ingen aktivitet ennå.</div>';return;}
     const drinkIds=feed.filter(e=>e.kind==='drink').map(e=>e.drink.id);
@@ -155,7 +157,7 @@ function renderDrinkFeedItem(d,interactions,byUser) {
             ${avatarHtml(user,30,'.78em')}
             <div class="dinf">
                 <div class="dn">${esc(displayName(user))}${isMe?'<span class="metag">(deg)</span>':''} drakk ${esc(d.type_name)}${d.qty!==1?` ×${d.qty}`:''}</div>
-                <div class="dm">${fmtDate(d.ts)}${eventMeta(d)}${d.note?' · '+esc(d.note):''}</div>
+                <div class="dm">${fmtDate(d.ts)}${eventMeta(d)}${drinkLocationMeta(d)}${d.note?' · '+esc(d.note):''}</div>
             </div>
             <div class="dr">
                 <span class="dg">${formatAlcohol(d.grams)}</span>

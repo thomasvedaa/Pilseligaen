@@ -23,8 +23,10 @@ async function loadProfileForAuthUser(authUserId) {
 
 function authMessage(error) {
     const msg=String(error?.message||'').toLowerCase();
+    const code=String(error?.code||'').toLowerCase();
     if (msg.includes('invalid login') || msg.includes('invalid credentials')) return 'Feil brukernavn eller passord.';
     if (msg.includes('email not confirmed')) return 'Brukeren må bekreftes i Supabase Auth først.';
+    if ((msg.includes('rate limit') && msg.includes('email')) || code.includes('rate_limit')) return 'Supabase har sendt for mange konto-e-poster akkurat nå. Vent litt, eller skru av e-postbekreftelse / sett opp egen SMTP i Supabase.';
     if (msg.includes('password')) return 'Passordet må være minst 6 tegn.';
     return error?.message ? `Feil: ${error.message}` : 'Noe gikk galt.';
 }

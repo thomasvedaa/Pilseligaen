@@ -223,6 +223,32 @@ async function endTrip(eventId) {
     showToast('Tur avsluttet 👑');
 }
 
+async function deleteTrip(eventId) {
+    const event=eventById(eventId);
+    if (!event) return;
+    if (event.created_by!==CU.id) {showToast('Bare turlederen kan slette turen.',false);return;}
+    if (!confirm(`Slette "${event.name}"? Drikkene beholdes, men kobles fra turen.`)) return;
+    const typed=prompt(`Skriv SLETT for å bekrefte sletting av "${event.name}".`);
+    if (String(typed||'').trim().toUpperCase()!=='SLETT') {
+        showToast('Sletting avbrutt.',false);
+        return;
+    }
+
+    setLoading(true,'Sletter tur...');
+    const {data,error}=await sb.from('pl_events').delete().eq('id',eventId).eq('created_by',CU.id).select('id');
+    setLoading(false);
+    if (error) {showToast('Kunne ikke slette turen. Kjør oppdatert schema.sql først.',false);return;}
+    if (!data?.length) {showToast('Fant ikke en tur du kan slette.',false);return;}
+
+    if (currentEventId===eventId) {
+        currentEventId='';
+        localStorage.removeItem('pl_event_filter');
+    }
+    await loadEvents();
+    await refreshActiveScope();
+    showToast('Tur slettet.');
+}
+
 async function fetchUsersForCurrentScope(users) {
     if (!eventSchemaReady || !currentEventId) return users||[];
     const {data,error}=await sb.from('pl_event_members').select('user_id').eq('event_id',currentEventId);
@@ -294,6 +320,7 @@ async function renderEvents() {
     el.innerHTML=eventCache.map(e=>{
         const ended=!!e.ended_at;
         const canEnd=!ended && e.created_by===CU.id;
+        const canDelete=e.created_by===CU.id;
         const endedMeta=ended?` · <span class="badge">Avsluttet ${fmtDate(e.ended_at)}</span>`:'';
         return `
         <div class="event-card${e.id===currentEventId?' active':''}${ended?' ended':''}">
@@ -305,6 +332,7 @@ async function renderEvents() {
             <div class="event-actions">
                 <button class="icon-btn" onclick="copyEventCode('${esc(e.code)}')">Kopier kode</button>
                 ${canEnd?`<button class="btn btn-d btn-sm" onclick="endTrip('${e.id}')">Avslutt tur</button>`:''}
+                ${canDelete?`<button class="btn btn-d btn-sm" onclick="deleteTrip('${e.id}')">Slett tur</button>`:''}
                 <button class="btn btn-p btn-sm" onclick="activateEvent('${e.id}')">${e.id===currentEventId?'Aktiv':'Vis'}</button>
             </div>
         </div>
