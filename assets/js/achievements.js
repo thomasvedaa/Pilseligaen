@@ -30,6 +30,7 @@ const ACHIEVEMENTS = [
     {id:'split_the_g', icon:'🍀', name:'Split the G', desc:'Drakk din første Guinness.', check:s=>s.guinnessCount>=1, progress:s=>`${Math.min(s.guinnessCount,1)}/1`},
     {id:'g_spot', icon:'🎯', name:'Finding th G spot?', desc:'100 Guinness drukket.', check:s=>s.guinnessCount>=100, progress:s=>`${Math.min(s.guinnessCount,100)}/100`},
     {id:'tur_konge', icon:'👑', name:'Tur konge', desc:'Drakk mest på en gruppetur da turen ble avsluttet.', check:s=>s.turKongeWins>=1, progress:s=>s.turKongeWins>=1?`${s.turKongeWins} turer`:'0/1'},
+    {id:'edru_sjafor', icon:'🚗', name:'Edru sjåfør', desc:'Drakk minst (men noe) på en avsluttet tur med 3+ deltakere.', check:s=>s.edruSjaforWins>=1, progress:s=>s.edruSjaforWins>=1?`${s.edruSjaforWins} turer`:'0/1'},
 
 ];
 
@@ -177,7 +178,8 @@ function summarizeAchievements(user,drinks,extra={}) {
         maxMonthDays,
         maxMonthBeerLiters,
         guinnessCount,
-        turKongeWins:extra.turKongeWins||0
+        turKongeWins:extra.turKongeWins||0,
+        edruSjaforWins:extra.edruSjaforWins||0
     }));
 
     return {
@@ -207,6 +209,7 @@ function summarizeAchievements(user,drinks,extra={}) {
         maxMonthBeerLiters,
         guinnessCount,
         turKongeWins:extra.turKongeWins||0,
+        edruSjaforWins:extra.edruSjaforWins||0,
         unlockedCount:unlocked.length
     };
 }
@@ -342,22 +345,26 @@ async function loadAchievementData() {
     ]);
     if (userError || drinkError) return {error:userError||drinkError};
 
-    const turKongeWins=computeTurKongeWins(endedEventsRes?.data||[],membersRes?.data||[],drinks||[]);
+    const tripStandings=computeTripStandings(endedEventsRes?.data||[],membersRes?.data||[],drinks||[]);
 
     const scopeUsers=await fetchUsersForCurrentScope(users||[]);
     const scopeDrinks=visibleDrinksForScope(drinks||[]);
     const drinksByUser={};
     scopeDrinks.forEach(d=>{(drinksByUser[d.user_id] ||= []).push(d);});
     const summaries=scopeUsers
-        .map(u=>summarizeAchievements(u,drinksByUser[u.id]||[],{turKongeWins:turKongeWins[u.id]||0}))
+        .map(u=>summarizeAchievements(u,drinksByUser[u.id]||[],{
+            turKongeWins:tripStandings.turKonge[u.id]||0,
+            edruSjaforWins:tripStandings.edruSjafor[u.id]||0
+        }))
         .sort((a,b)=>b.unlockedCount-a.unlockedCount || b.bestStreak-a.bestStreak || displayName(a.user).localeCompare(displayName(b.user),'no'));
 
     return {users:scopeUsers,drinks:scopeDrinks,summaries,unlockStats:achievementUnlockStats(summaries)};
 }
 
-function computeTurKongeWins(endedEvents,members,drinks) {
-    const wins={};
-    if (!endedEvents.length) return wins;
+function computeTripStandings(endedEvents,members,drinks) {
+    const turKonge={};
+    const edruSjafor={};
+    if (!endedEvents.length) return {turKonge,edruSjafor};
     const membersByEvent={};
     members.forEach(m=>{(membersByEvent[m.event_id] ||= new Set()).add(m.user_id);});
     endedEvents.forEach(ev=>{
@@ -371,15 +378,22 @@ function computeTurKongeWins(endedEvents,members,drinks) {
             if (!memberSet.has(d.user_id)) return;
             gramsBy[d.user_id]=(gramsBy[d.user_id]||0)+(Number(d.grams)||0);
         });
-        const entries=Object.entries(gramsBy);
+        const entries=Object.entries(gramsBy).filter(([,g])=>g>0);
         if (!entries.length) return;
         const max=Math.max(...entries.map(([,g])=>g));
-        if (max<=0) return;
         entries.filter(([,g])=>g===max).forEach(([uid])=>{
-            wins[uid]=(wins[uid]||0)+1;
+            turKonge[uid]=(turKonge[uid]||0)+1;
         });
+        if (memberSet.size>=3 && entries.length>=2) {
+            const min=Math.min(...entries.map(([,g])=>g));
+            if (min<max) {
+                entries.filter(([,g])=>g===min).forEach(([uid])=>{
+                    edruSjafor[uid]=(edruSjafor[uid]||0)+1;
+                });
+            }
+        }
     });
-    return wins;
+    return {turKonge,edruSjafor};
 }
 
 function renderStreakBadge(summary) {
