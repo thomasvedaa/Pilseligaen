@@ -22,6 +22,8 @@ if (window.Chart) {
 }
 
 const ALCOHOL_UNIT_GRAMS = 12;
+const AUTH_EMAIL_DOMAIN = 'pilseligaen.local';
+const PROFILE_SELECT = 'id,username,nickname,avatar_url,color,created_at';
 let alcoholMode = localStorage.getItem('pl_alcohol_mode') || 'grams';
 
 const DEFAULT_DTYPES = [
@@ -121,6 +123,18 @@ function fmtVolume(ml) {
 function fmtDate(iso) {
     const d = new Date(iso);
     return d.toLocaleDateString('no-NO',{weekday:'short',day:'numeric',month:'short'}) + ' kl. ' + d.toLocaleTimeString('no-NO',{hour:'2-digit',minute:'2-digit'});
+}
+function safeAuthName(value) {
+    return String(value||'')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]+/g,'-')
+        .replace(/^-+|-+$/g,'') || 'bruker';
+}
+function authEmailFromUsername(value) {
+    const raw=String(value||'').trim().toLowerCase();
+    if (raw.endsWith(`@${AUTH_EMAIL_DOMAIN}`)) return raw;
+    return `${safeAuthName(raw)}@${AUTH_EMAIL_DOMAIN}`;
 }
 function eventById(id=currentEventId) {
     return (eventCache||[]).find(e=>e.id===id)||null;

@@ -155,20 +155,18 @@ async function createTripEvent() {
     if (code.length<3) {showToast('Kode må ha minst 3 tegn.',false);return;}
 
     setLoading(true,'Oppretter tur...');
-    const {data:event,error}=await sb.from('pl_events')
-        .insert({name,code,code_lc:code.toLowerCase(),created_by:CU.id})
-        .select('*')
-        .single();
+    const {data:event,error}=await sb.rpc('create_event_with_code',{
+        event_name:name,
+        input_code:code
+    });
 
     if (error) {
         setLoading(false);
-        showToast('Kunne ikke opprette. Koden er kanskje brukt.',false);
+        showToast(error.message||'Kunne ikke opprette. Koden er kanskje brukt.',false);
         return;
     }
 
-    const {error:memberError}=await sb.from('pl_event_members').insert({event_id:event.id,user_id:CU.id});
     setLoading(false);
-    if (memberError) {showToast('Turen ble laget, men medlemskap feilet.',false);return;}
 
     document.getElementById('event-name').value='';
     document.getElementById('event-code').value='';
@@ -182,20 +180,14 @@ async function joinEventByCode() {
     if (code.length<3) {showToast('Skriv inn en gyldig kode.',false);return;}
 
     setLoading(true,'Sjekker kode...');
-    const {data:event,error}=await sb.from('pl_events')
-        .select('*')
-        .eq('code_lc',code.toLowerCase())
-        .maybeSingle();
+    const {data:event,error}=await sb.rpc('join_event_by_code',{input_code:code});
     if (error || !event) {
         setLoading(false);
-        showToast('Fant ingen tur med den koden.',false);
+        showToast(error?.message||'Fant ingen tur med den koden.',false);
         return;
     }
 
-    const {error:memberError}=await sb.from('pl_event_members')
-        .upsert({event_id:event.id,user_id:CU.id},{onConflict:'event_id,user_id'});
     setLoading(false);
-    if (memberError) {showToast('Kunne ikke bli med i turen.',false);return;}
 
     document.getElementById('event-join-code').value='';
     await afterEventJoined(event);

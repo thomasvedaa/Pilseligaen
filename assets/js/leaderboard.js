@@ -122,7 +122,7 @@ async function fetchAndRenderLb(filter) {
     if (end) drinkQuery=drinkQuery.lt('ts',end.toISOString());
 
     const {data:allDrinksRaw} = await drinkQuery;
-    const {data:usersRaw}     = await sb.from('pl_users').select('*');
+    const {data:usersRaw}     = await sb.from('pl_users').select(PROFILE_SELECT);
     if (!allDrinksRaw||!usersRaw) return;
 
     const users=await fetchUsersForCurrentScope(usersRaw||[]);

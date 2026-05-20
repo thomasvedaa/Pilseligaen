@@ -308,7 +308,7 @@ function achievementUnlockStats(summaries) {
 
 async function loadAchievementData() {
     const [{data:users,error:userError},{data:drinks,error:drinkError}]=await Promise.all([
-        sb.from('pl_users').select('*'),
+        sb.from('pl_users').select(PROFILE_SELECT),
         sb.from('pl_drinks').select('*')
     ]);
     if (userError || drinkError) return {error:userError||drinkError};

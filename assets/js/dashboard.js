@@ -89,7 +89,7 @@ async function renderDrinkFeed() {
     const el=document.getElementById('drink-feed');
     const [{data:drinks,error},{data:users}] = await Promise.all([
         sb.from('pl_drinks').select('*').order('ts',{ascending:false}),
-        sb.from('pl_users').select('*')
+        sb.from('pl_users').select(PROFILE_SELECT)
     ]);
     if (error){el.innerHTML=`<div class="empty">Feil: ${esc(error.message)}</div>`;return;}
 

@@ -32,7 +32,7 @@ async function editNickname() {
     if (nickname.length>32){showToast('Maks 32 tegn.',false);return;}
 
     setLoading(true,'Lagrer kallenavn…');
-    const {data,error}=await sb.from('pl_users').update({nickname}).eq('id',CU.id).select('*').single();
+    const {data,error}=await sb.from('pl_users').update({nickname}).eq('id',CU.id).select(PROFILE_SELECT).single();
     setLoading(false);
     if (error){
         showToast('Kunne ikke lagre. Kjør oppdatert schema.sql i Supabase først.',false);
@@ -56,7 +56,7 @@ async function editAvatar() {
     }
 
     setLoading(true,'Lagrer profilbilde…');
-    const {data,error}=await sb.from('pl_users').update({avatar_url:avatar_url||null}).eq('id',CU.id).select('*').single();
+    const {data,error}=await sb.from('pl_users').update({avatar_url:avatar_url||null}).eq('id',CU.id).select(PROFILE_SELECT).single();
     setLoading(false);
     if (error){
         showToast('Kunne ikke lagre. Kjør oppdatert schema.sql i Supabase først.',false);
