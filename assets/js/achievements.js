@@ -322,10 +322,59 @@ function achievementUnlockEvents(user,drinks) {
     return events;
 }
 
-function achievementFeedEvents(users,drinks) {
+function computeTripWinnersPerEvent(endedEvents,members,drinks) {
+    const result=[];
+    if (!endedEvents.length) return result;
+    const membersByEvent={};
+    members.forEach(m=>{(membersByEvent[m.event_id] ||= new Set()).add(m.user_id);});
+    endedEvents.forEach(ev=>{
+        const memberSet=membersByEvent[ev.id]||new Set();
+        if (memberSet.size<2) return;
+        const endedAt=new Date(ev.ended_at);
+        const gramsBy={};
+        drinks.forEach(d=>{
+            if (d.event_id!==ev.id) return;
+            if (new Date(d.ts)>endedAt) return;
+            if (!memberSet.has(d.user_id)) return;
+            gramsBy[d.user_id]=(gramsBy[d.user_id]||0)+(Number(d.grams)||0);
+        });
+        const entries=Object.entries(gramsBy).filter(([,g])=>g>0);
+        if (!entries.length) return;
+        const max=Math.max(...entries.map(([,g])=>g));
+        const turKonge=entries.filter(([,g])=>g===max).map(([uid])=>uid);
+        let edruSjafor=[];
+        if (memberSet.size>=3 && entries.length>=2) {
+            const min=Math.min(...entries.map(([,g])=>g));
+            if (min<max) edruSjafor=entries.filter(([,g])=>g===min).map(([uid])=>uid);
+        }
+        result.push({event:ev,turKonge,edruSjafor});
+    });
+    return result;
+}
+
+function achievementFeedEvents(users,drinks,endedEvents=[],members=[]) {
     const drinksByUser={};
     (drinks||[]).forEach(d=>{(drinksByUser[d.user_id] ||= []).push(d);});
-    return (users||[]).flatMap(u=>achievementUnlockEvents(u,drinksByUser[u.id]||[]));
+    const userById={};
+    (users||[]).forEach(u=>{userById[u.id]=u;});
+
+    const drinkBased=(users||[]).flatMap(u=>achievementUnlockEvents(u,drinksByUser[u.id]||[]));
+
+    const tripBased=[];
+    computeTripWinnersPerEvent(endedEvents,members,drinks||[]).forEach(({event,turKonge,edruSjafor})=>{
+        turKonge.forEach(uid=>{
+            const user=userById[uid];
+            if (!user) return;
+            tripBased.push({id:`ach:${uid}:tur_konge:${event.id}`,kind:'achievement',user_id:uid,user,achievement:achievementById('tur_konge'),event_id:event.id,ts:event.ended_at,drink_ts:event.ended_at});
+        });
+        edruSjafor.forEach(uid=>{
+            const user=userById[uid];
+            if (!user) return;
+            tripBased.push({id:`ach:${uid}:edru_sjafor:${event.id}`,kind:'achievement',user_id:uid,user,achievement:achievementById('edru_sjafor'),event_id:event.id,ts:event.ended_at,drink_ts:event.ended_at});
+        });
+    });
+
+    return [...drinkBased,...tripBased];
 }
 
 function achievementUnlockStats(summaries) {

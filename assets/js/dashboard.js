@@ -118,9 +118,11 @@ async function fetchFeedInteractions(drinkIds,achievementIds=[]) {
 
 async function renderDrinkFeed() {
     const el=document.getElementById('drink-feed');
-    const [{data:drinks,error},{data:users}] = await Promise.all([
+    const [{data:drinks,error},{data:users},{data:endedEvents},{data:members}] = await Promise.all([
         sb.from('pl_drinks').select('*').order('ts',{ascending:false}),
-        sb.from('pl_users').select(PROFILE_SELECT)
+        sb.from('pl_users').select(PROFILE_SELECT),
+        sb.from('pl_events').select('*').not('ended_at','is',null),
+        sb.from('pl_event_members').select('event_id,user_id')
     ]);
     if (error){el.innerHTML=`<div class="empty">Feil: ${esc(error.message)}</div>`;return;}
 
@@ -130,7 +132,7 @@ async function renderDrinkFeed() {
     const allVisibleDrinks=drinks||[];
     const allDrinks=visibleDrinksForScope(allVisibleDrinks);
     const drinkEvents=allDrinks.map(d=>({id:`drink:${d.id}`,kind:'drink',ts:d.ts,drink:d}));
-    const allAchievementEvents=typeof achievementFeedEvents==='function' ? achievementFeedEvents(scopeUsers,allVisibleDrinks) : [];
+    const allAchievementEvents=typeof achievementFeedEvents==='function' ? achievementFeedEvents(scopeUsers,allVisibleDrinks,endedEvents||[],members||[]) : [];
     const achEvents=currentEventId ? allAchievementEvents.filter(e=>e.event_id===currentEventId) : allAchievementEvents;
     const feed=[...drinkEvents,...achEvents].sort((a,b)=>new Date(b.ts)-new Date(a.ts)).slice(0,30);
     if (!feed.length){el.innerHTML='<div class="empty">Ingen aktivitet ennå.</div>';return;}
