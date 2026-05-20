@@ -100,6 +100,16 @@ CREATE TABLE IF NOT EXISTS public.pl_drink_reactions (
     UNIQUE (drink_id,user_id,emoji)
 );
 
+-- ── ACHIEVEMENT-REAKSJONER ────────────────────────────
+CREATE TABLE IF NOT EXISTS public.pl_achievement_reactions (
+    id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    achievement_id  TEXT        NOT NULL,
+    user_id         UUID        NOT NULL REFERENCES public.pl_users(id) ON DELETE CASCADE,
+    emoji           TEXT        NOT NULL,
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (achievement_id,user_id,emoji)
+);
+
 -- ── INDEKSER ───────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_pl_drinks_user_id ON public.pl_drinks(user_id);
 CREATE INDEX IF NOT EXISTS idx_pl_drinks_ts      ON public.pl_drinks(ts);
@@ -110,6 +120,7 @@ CREATE INDEX IF NOT EXISTS idx_pl_event_members_user_id ON public.pl_event_membe
 CREATE INDEX IF NOT EXISTS idx_pl_event_members_event_id ON public.pl_event_members(event_id);
 CREATE INDEX IF NOT EXISTS idx_pl_drink_comments_drink_id ON public.pl_drink_comments(drink_id);
 CREATE INDEX IF NOT EXISTS idx_pl_drink_reactions_drink_id ON public.pl_drink_reactions(drink_id);
+CREATE INDEX IF NOT EXISTS idx_pl_achievement_reactions_aid ON public.pl_achievement_reactions(achievement_id);
 
 -- ── ROW LEVEL SECURITY ─────────────────────────────────
 -- RLS protects data when the public anon key is used from the browser.
@@ -121,6 +132,7 @@ ALTER TABLE public.pl_event_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pl_drinks      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pl_drink_comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pl_drink_reactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pl_achievement_reactions ENABLE ROW LEVEL SECURITY;
 
 -- Helper functions used by policies. SECURITY DEFINER prevents RLS recursion.
 CREATE OR REPLACE FUNCTION public.current_profile_id()
@@ -310,6 +322,7 @@ DROP POLICY IF EXISTS "open_access_event_members" ON public.pl_event_members;
 DROP POLICY IF EXISTS "open_access_drinks"       ON public.pl_drinks;
 DROP POLICY IF EXISTS "open_access_drink_comments" ON public.pl_drink_comments;
 DROP POLICY IF EXISTS "open_access_drink_reactions" ON public.pl_drink_reactions;
+DROP POLICY IF EXISTS "open_access_achievement_reactions" ON public.pl_achievement_reactions;
 
 DROP POLICY IF EXISTS "profiles_select_authenticated" ON public.pl_users;
 DROP POLICY IF EXISTS "profiles_insert_self" ON public.pl_users;
@@ -404,6 +417,10 @@ CREATE POLICY "reactions_delete_self"
     ON public.pl_drink_reactions FOR DELETE TO authenticated
     USING (user_id = public.current_profile_id());
 
+CREATE POLICY "open_access_achievement_reactions"
+    ON public.pl_achievement_reactions FOR ALL TO anon, authenticated
+    USING (true) WITH CHECK (true);
+
 -- ── REALTIME (for sanntids-ledertavle) ─────────────────
 DO $$
 BEGIN
@@ -440,6 +457,13 @@ BEGIN
         WHERE pubname='supabase_realtime' AND schemaname='public' AND tablename='pl_drink_reactions'
     ) THEN
         ALTER PUBLICATION supabase_realtime ADD TABLE public.pl_drink_reactions;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables
+        WHERE pubname='supabase_realtime' AND schemaname='public' AND tablename='pl_achievement_reactions'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.pl_achievement_reactions;
     END IF;
 END $$;
 

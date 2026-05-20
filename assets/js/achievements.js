@@ -31,6 +31,7 @@ const ACHIEVEMENTS = [
     {id:'g_spot', icon:'🎯', name:'Finding th G spot?', desc:'100 Guinness drukket.', check:s=>s.guinnessCount>=100, progress:s=>`${Math.min(s.guinnessCount,100)}/100`},
     {id:'tur_konge', icon:'👑', name:'Tur konge', desc:'Drakk mest på en gruppetur da turen ble avsluttet.', check:s=>s.turKongeWins>=1, progress:s=>s.turKongeWins>=1?`${s.turKongeWins} turer`:'0/1'},
     {id:'edru_sjafor', icon:'🚗', name:'Edru sjåfør', desc:'Drakk minst (men noe) på en avsluttet tur med 3+ deltakere.', check:s=>s.edruSjaforWins>=1, progress:s=>s.edruSjaforWins>=1?`${s.edruSjaforWins} turer`:'0/1'},
+    {id:'legendary_pull', icon:'⚡', name:'Legendary pull', desc:'Drakk en energiøl. Reinheitsgebot RIP.', check:s=>s.hasEnergyBeer, progress:s=>s.hasEnergyBeer?'Klar':'0/1'},
 
 ];
 
@@ -118,6 +119,7 @@ function summarizeAchievements(user,drinks,extra={}) {
     let hasLateNight=false;
     let hasComeback=false;
     let guinnessCount=0;
+    let hasEnergyBeer=false;
 
     sorted.forEach((d,i)=>{
         const k=dayKey(d.ts);
@@ -135,6 +137,7 @@ function summarizeAchievements(user,drinks,extra={}) {
         const txt=`${d.type_name||''} ${d.note||''}`.toLowerCase();
         if (/(chilli|chili|klaus)/.test(txt)) hasChilli=true;
         if (/guinness/.test(txt)) guinnessCount+=Number(d.qty)||1;
+        if (/energi[øo]l/.test(txt)) hasEnergyBeer=true;
 
         const hour=new Date(d.ts).getHours();
         if (hour>=6 && hour<7) hasMorning=true;
@@ -178,6 +181,7 @@ function summarizeAchievements(user,drinks,extra={}) {
         maxMonthDays,
         maxMonthBeerLiters,
         guinnessCount,
+        hasEnergyBeer,
         turKongeWins:extra.turKongeWins||0,
         edruSjaforWins:extra.edruSjaforWins||0
     }));
@@ -208,6 +212,7 @@ function summarizeAchievements(user,drinks,extra={}) {
         maxMonthDays,
         maxMonthBeerLiters,
         guinnessCount,
+        hasEnergyBeer,
         turKongeWins:extra.turKongeWins||0,
         edruSjaforWins:extra.edruSjaforWins||0,
         unlockedCount:unlocked.length
@@ -294,6 +299,7 @@ function achievementUnlockEvents(user,drinks) {
             if (guinnessCount>=1) unlock('split_the_g',d);
             if (guinnessCount>=100) unlock('g_spot',d);
         }
+        if (/energi[øo]l/.test(txt)) unlock('legendary_pull',d);
 
         const hour=new Date(d.ts).getHours();
         if (hour>=6 && hour<7) unlock('morningbird',d);
