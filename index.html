@@ -6,7 +6,7 @@
     <title>🍺 Pilseligaen</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-    <link rel="stylesheet" href="assets/css/styles.css?v=20260519-pubnight">
+    <link rel="stylesheet" href="assets/css/styles.css?v=20260520-events-h2h2">
 </head>
 <body>
 
@@ -104,6 +104,16 @@
     <div class="view" id="view-stats">
         <h2>Min statistikk</h2>
         <div class="stat-grid" id="stats-sum"></div>
+        <div class="card">
+            <div class="sh">
+                <div class="st">Head to head</div>
+                <div class="h2h-controls">
+                    <select id="h2h-a" onchange="setH2hUser('a',this.value)"></select>
+                    <select id="h2h-b" onchange="setH2hUser('b',this.value)"></select>
+                </div>
+            </div>
+            <div id="h2h-result"><div class="vload"><div class="spinner"></div>Laster...</div></div>
+        </div>
         <div class="card">
             <div class="sh">
                 <div class="st">Alkohol over tid</div>
@@ -266,18 +276,18 @@
     </nav>
 </div>
 
-<script src="assets/js/core.js?v=20260520-rls"></script>
-<script src="assets/js/supabase-client.js?v=20260520-rls"></script>
-<script src="assets/js/boot.js?v=20260520-rls"></script>
-<script src="assets/js/auth.js?v=20260520-rls"></script>
-<script src="assets/js/app.js?v=20260520-rls"></script>
-<script src="assets/js/events.js?v=20260520-rls"></script>
-<script src="assets/js/drink-types.js?v=20260520-rls"></script>
-<script src="assets/js/drink-log.js?v=20260520-rls"></script>
-<script src="assets/js/dashboard.js?v=20260520-rls"></script>
-<script src="assets/js/stats.js?v=20260520-rls"></script>
-<script src="assets/js/leaderboard.js?v=20260520-rls"></script>
-<script src="assets/js/achievements.js?v=20260520-rls"></script>
+<script src="assets/js/core.js?v=20260520-events-h2h2"></script>
+<script src="assets/js/supabase-client.js?v=20260520-events-h2h2"></script>
+<script src="assets/js/boot.js?v=20260520-events-h2h2"></script>
+<script src="assets/js/auth.js?v=20260520-events-h2h2"></script>
+<script src="assets/js/app.js?v=20260520-events-h2h2"></script>
+<script src="assets/js/events.js?v=20260520-events-h2h2"></script>
+<script src="assets/js/drink-types.js?v=20260520-events-h2h2"></script>
+<script src="assets/js/drink-log.js?v=20260520-events-h2h2"></script>
+<script src="assets/js/dashboard.js?v=20260520-events-h2h2"></script>
+<script src="assets/js/stats.js?v=20260520-events-h2h2"></script>
+<script src="assets/js/leaderboard.js?v=20260520-events-h2h2"></script>
+<script src="assets/js/achievements.js?v=20260520-events-h2h2"></script>
 <script src="assets/js/confetti.js?v=20260520-confettifix"></script>
 </body>
 </html>

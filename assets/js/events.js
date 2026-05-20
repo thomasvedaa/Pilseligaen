@@ -211,6 +211,50 @@ async function fetchUsersForCurrentScope(users) {
     return (users||[]).filter(u=>ids.has(u.id));
 }
 
+async function loadEventLeaderStats() {
+    const ids=(eventCache||[]).map(e=>e.id).filter(Boolean);
+    if (!ids.length) return {};
+
+    const {data:drinks,error}=await sb.from('pl_drinks')
+        .select('event_id,user_id,grams,vol_ml,qty,type_name,abv')
+        .in('event_id',ids);
+    if (error || !drinks?.length) return {};
+
+    const userIds=[...new Set(drinks.map(d=>d.user_id).filter(Boolean))];
+    const {data:users}=userIds.length
+        ? await sb.from('pl_users').select(PROFILE_SELECT).in('id',userIds)
+        : {data:[]};
+    const byUser=Object.fromEntries((users||[]).map(u=>[u.id,u]));
+    const byEvent={};
+
+    drinks.forEach(d=>{
+        const event=(byEvent[d.event_id] ||= {totalGrams:0,drinkCount:0,users:{}});
+        const row=(event.users[d.user_id] ||= {user:byUser[d.user_id]||{id:d.user_id,username:'Ukjent',color:USER_COLORS[0]},grams:0,drinkCount:0});
+        const g=Number(d.grams)||0;
+        event.totalGrams+=g;
+        event.drinkCount++;
+        row.grams+=g;
+        row.drinkCount++;
+    });
+
+    Object.values(byEvent).forEach(event=>{
+        event.leader=Object.values(event.users).sort((a,b)=>b.grams-a.grams || displayName(a.user).localeCompare(displayName(b.user),'no'))[0]||null;
+    });
+
+    return byEvent;
+}
+
+function renderEventLeaderLine(stats) {
+    if (!stats?.leader) return '<div class="event-stats">Ingen registreringer ennå</div>';
+    const leader=stats.leader;
+    return `<div class="event-stats">
+        <span class="event-leader">${avatarHtml(leader.user,22,'.7em')} Leder: <strong>${esc(displayName(leader.user))}</strong></span>
+        <span>${formatAlcohol(leader.grams)}</span>
+        <span>${leader.drinkCount} ${leader.drinkCount===1?'registrering':'registreringer'}</span>
+        <span>Totalt ${formatAlcohol(stats.totalGrams)}</span>
+    </div>`;
+}
+
 async function renderEvents() {
     const el=document.getElementById('event-list');
     if (!el) return;
@@ -226,11 +270,13 @@ async function renderEvents() {
         return;
     }
 
+    const eventStats=await loadEventLeaderStats();
     el.innerHTML=eventCache.map(e=>`
         <div class="event-card${e.id===currentEventId?' active':''}">
             <div class="event-main">
                 <div class="event-name">${esc(e.name)}</div>
                 <div class="event-meta">Kode <strong>${esc(e.code)}</strong> · ${e.member_count||1} ${e.member_count===1?'person':'personer'}</div>
+                ${renderEventLeaderLine(eventStats[e.id])}
             </div>
             <div class="event-actions">
                 <button class="icon-btn" onclick="copyEventCode('${esc(e.code)}')">Kopier kode</button>

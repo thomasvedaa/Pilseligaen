@@ -10,8 +10,8 @@ const ACHIEVEMENTS = [
     {id:'units100', icon:'🥈', name:'Godt i gang', desc:'100 alkoholenheter totalt.', check:s=>s.totalUnits>=100, progress:s=>`${fmtAchievementUnits(Math.min(s.totalUnits,100))}/100 enheter`},
     {id:'units1000', icon:'🥇', name:'Veteran', desc:'1000 alkoholenheter totalt.', check:s=>s.totalUnits>=1000, progress:s=>`${fmtAchievementUnits(Math.min(s.totalUnits,1000))}/1000 enheter`},
     {id:'units5000', icon:'💀', name:'Legenden', desc:'5000 alkoholenheter totalt.', check:s=>s.totalUnits>=5000, progress:s=>`${fmtAchievementUnits(Math.min(s.totalUnits,5000))}/5000 enheter`},
-    {id:'streak10', icon:'🔥', name:'10 dager streak', desc:'Drakk 10 dager på rad.', check:s=>s.bestStreak>=10, progress:s=>`${Math.min(s.bestStreak,10)}/10 dager`},
-    {id:'streak100', icon:'🔥', name:'100 dager streak', desc:'Drakk 100 dager på rad.', check:s=>s.bestStreak>=100, progress:s=>`${Math.min(s.bestStreak,100)}/100 dager`},
+    {id:'streak10', icon:'🔥', name:'3 dager streak', desc:'Drakk 3 dager på rad.', check:s=>s.bestStreak>=10, progress:s=>`${Math.min(s.bestStreak,10)}/3 dager`},
+    {id:'streak100', icon:'🔥', name:'10 dager streak', desc:'Drakk 10 dager på rad.', check:s=>s.bestStreak>=100, progress:s=>`${Math.min(s.bestStreak,100)}/10 dager`},
     {id:'twelve_half', icon:'🍺', name:'Yummers', desc:'Minst 12 halvlitere øl i samme kveld.', check:s=>s.maxEveningHalfLiters>=12, progress:s=>`${fmtNo(Math.min(s.maxEveningHalfLiters,12),1)}/12`},
     {id:'chilli_klaus', icon:'🌶️', name:'Chili Klaus', desc:'Tatt deg en shot med guds gave', check:s=>s.hasChilli, progress:s=>s.hasChilli?'Klar':'0/1'},
     {id:'morningbird', icon:'🌅', name:'Six seven', desc:'Registrerte en drink mellom 06 og 07.', check:s=>s.hasMorning, progress:s=>s.hasMorning?'Klar':'0/1'},
@@ -102,6 +102,7 @@ function summarizeAchievements(user,drinks) {
     const totalUnits=totalGrams/ALCOHOL_UNIT_GRAMS;
     const days=[...new Set(sorted.map(d=>dayKey(d.ts)))].sort();
     const streak=streakStats(days);
+    const weekendStreak=weekendStreakStats(sorted);
     const liters={beer:0,wine:0,spirits:0};
     const dayCategories={};
     const eveningHalfLiters={};
@@ -158,6 +159,8 @@ function summarizeAchievements(user,drinks) {
         drinkDays:days.length,
         currentStreak:streak.current,
         bestStreak:streak.best,
+        currentWeekendStreak:weekendStreak.current,
+        bestWeekendStreak:weekendStreak.best,
         liters,
         maxEveningHalfLiters,
         hasChilli,
@@ -180,7 +183,11 @@ function summarizeAchievements(user,drinks) {
         currentStreak:streak.current,
         bestStreak:streak.best,
         streakActive:streak.active && streak.current>0,
+        currentWeekendStreak:weekendStreak.current,
+        bestWeekendStreak:weekendStreak.best,
+        weekendStreakActive:weekendStreak.active && weekendStreak.current>0,
         lastDay:streak.last,
+        lastWeekend:weekendStreak.last,
         liters,
         maxEveningHalfLiters,
         hasChilli,
@@ -353,12 +360,15 @@ function renderAchievementUser(summary,unlockStats={},options={}) {
     const name=displayName(user);
     const isMe=user.id===CU.id;
     const title=options.title||'';
+    const bestWeekend=summary.bestWeekendStreak||0;
+    const currentWeekend=summary.weekendStreakActive?summary.currentWeekendStreak:0;
     return `<div class="ach-user-card${isMe?' me':''}">
         ${title?`<div class="st" style="margin-bottom:14px">${esc(title)}</div>`:''}
         <div class="ach-user-head">
             ${avatarHtml(user,42,'.9em')}
             <div class="ach-user-main">
                 <div class="ach-user-name">${esc(name)}${isMe?'<span class="metag">(deg)</span>':''}</div>
+                <div class="ach-user-meta">Helgestreak ${currentWeekend} aktiv · beste ${bestWeekend} ${bestWeekend===1?'helg':'helger'}</div>
                 <div class="ach-user-meta">${summary.unlockedCount}/${ACHIEVEMENTS.length} merker · beste streak ${summary.bestStreak} ${summary.bestStreak===1?'dag':'dager'} · ${summary.drinkDays} drikkedager</div>
             </div>
             ${renderStreakBadge(summary)}
@@ -367,6 +377,7 @@ function renderAchievementUser(summary,unlockStats={},options={}) {
             <span>Øl <strong>${fmtLiters(summary.liters.beer)}</strong></span>
             <span>Vin <strong>${fmtLiters(summary.liters.wine)}</strong></span>
             <span>Sprit <strong>${fmtLiters(summary.liters.spirits)}</strong></span>
+            <span>Helgestreak <strong>${currentWeekend}</strong> / ${bestWeekend}</span>
         </div>
         <div class="ach-grid">
             ${ACHIEVEMENTS.map(a=>renderAchievementBadge(a,summary,unlockStats)).join('')}
@@ -468,6 +479,7 @@ async function renderAchievementProfile(userId=achProfileUserId) {
             <div class="card"><div class="ct">Totalt</div><div class="cv">${formatAlcoholValue(summary.drinks.reduce((s,d)=>s+(Number(d.grams)||0),0))}</div><div class="cs">${alcoholSubLabel()}</div></div>
             <div class="card"><div class="ct">Drikkedager</div><div class="cv">${summary.drinkDays}</div><div class="cs">registrerte dager</div></div>
             <div class="card"><div class="ct">Beste streak</div><div class="cv">${summary.bestStreak}</div><div class="cs">${summary.bestStreak===1?'dag':'dager'}</div></div>
+            <div class="card"><div class="ct">Helgestreak</div><div class="cv">${summary.weekendStreakActive?summary.currentWeekendStreak:0}</div><div class="cs">beste ${summary.bestWeekendStreak||0} ${(summary.bestWeekendStreak||0)===1?'helg':'helger'}</div></div>
             <div class="card"><div class="ct">Merker</div><div class="cv">${summary.unlockedCount}</div><div class="cs">av ${ACHIEVEMENTS.length}</div></div>
         </div>
         ${renderAchievementUser(summary,data.unlockStats,{title:`${displayName(summary.user)} sine merker`})}

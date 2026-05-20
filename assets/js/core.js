@@ -166,6 +166,69 @@ function dayLabel(key) {
     const [,m,d]=key.split('-');
     return `${d}.${m}`;
 }
+function keyToDate(key) {
+    const [y,m,d]=key.split('-').map(Number);
+    return new Date(y,m-1,d);
+}
+function dayDiff(fromKey,toKey) {
+    return Math.round((keyToDate(toKey)-keyToDate(fromKey))/86400000);
+}
+function weekendAlcoholKey(iso) {
+    const d=new Date(iso);
+    const day=d.getDay();
+    if (![0,4,5,6].includes(day)) return null;
+    if (day===0) d.setDate(d.getDate()-3);
+    if (day===5) d.setDate(d.getDate()-1);
+    if (day===6) d.setDate(d.getDate()-2);
+    return dayKey(d);
+}
+function currentWeekendKey(now=new Date()) {
+    const d=new Date(now);
+    const day=d.getDay();
+    if (day===0) d.setDate(d.getDate()-3);
+    if (day===1) d.setDate(d.getDate()-4);
+    if (day===2) d.setDate(d.getDate()-5);
+    if (day===3) d.setDate(d.getDate()-6);
+    if (day===5) d.setDate(d.getDate()-1);
+    if (day===6) d.setDate(d.getDate()-2);
+    return dayKey(d);
+}
+function weekendDiff(fromKey,toKey) {
+    return Math.round(dayDiff(fromKey,toKey)/7);
+}
+function weekendLabel(key) {
+    const start=keyToDate(key);
+    const end=new Date(start);
+    end.setDate(end.getDate()+3);
+    const f=d=>`${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}`;
+    return `${f(start)}-${f(end)}`;
+}
+function weekendStreakStats(drinksOrKeys) {
+    const keys=[...new Set((drinksOrKeys||[])
+        .map(row=>typeof row==='string'?row:weekendAlcoholKey(row?.ts))
+        .filter(Boolean))]
+        .sort();
+    if (!keys.length) return {current:0,best:0,active:false,last:null};
+
+    let best=1;
+    let run=1;
+    for (let i=1;i<keys.length;i++) {
+        run=weekendDiff(keys[i-1],keys[i])===1 ? run+1 : 1;
+        best=Math.max(best,run);
+    }
+
+    const last=keys[keys.length-1];
+    const active=last===currentWeekendKey();
+    let current=active?1:0;
+    if (active) {
+        for (let i=keys.length-2;i>=0;i--) {
+            if (weekendDiff(keys[i],keys[i+1])!==1) break;
+            current++;
+        }
+    }
+
+    return {current,best,active,last};
+}
 function fmtLiters(liters) {
     if (!liters) return '0 L';
     const digits = liters < 1 ? 2 : 1;

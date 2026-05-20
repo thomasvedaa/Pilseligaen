@@ -3,7 +3,11 @@
 ════════════════════════════════════════════ */
 async function getCustomDtypes(fresh=false) {
     if (dtCache && !fresh) return dtCache;
-    const {data}=await sb.from('pl_drink_types').select('*').order('created_at');
+    if (!CU) return [];
+    const {data}=await sb.from('pl_drink_types')
+        .select('id,name,vol_ml,abv,created_by,created_at')
+        .eq('created_by',CU.id)
+        .order('created_at');
     dtCache=(data||[]).map(t=>({...t,isDefault:false}));
     return dtCache;
 }
@@ -142,7 +146,7 @@ async function renderDtList() {
                 <div class="dtn">${t.name}</div>
                 <div class="dtm">${meta} · ${t.abv}% · <strong style="color:var(--accent)">${formatAlcohol(g)}</strong> per enhet</div>
             </div>
-            ${t.isDefault?'<span class="badge">Standard</span>':t.created_by===CU.id?`<button class="btn btn-d btn-sm" onclick="deleteDt('${t.id}')">Slett</button>`:'<span class="badge">Felles</span>'}
+            ${t.isDefault?'<span class="badge">Standard</span>':`<button class="btn btn-d btn-sm" onclick="deleteDt('${t.id}')">Slett</button>`}
         </div>`;
     }).join('');
 }

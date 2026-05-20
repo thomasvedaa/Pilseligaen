@@ -341,7 +341,7 @@ CREATE POLICY "profiles_update_self"
 
 CREATE POLICY "drink_types_select_authenticated"
     ON public.pl_drink_types FOR SELECT TO authenticated
-    USING (true);
+    USING (created_by = public.current_profile_id());
 
 CREATE POLICY "drink_types_insert_self"
     ON public.pl_drink_types FOR INSERT TO authenticated
