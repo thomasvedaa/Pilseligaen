@@ -48,17 +48,25 @@ function ensureFeedRealtime() {
         .on('postgres_changes',{event:'*',schema:'public',table:'pl_users'},()=>renderDashboard())
         .on('postgres_changes',{event:'*',schema:'public',table:'pl_drink_comments'},()=>renderDrinkFeed())
         .on('postgres_changes',{event:'*',schema:'public',table:'pl_drink_reactions'},()=>renderDrinkFeed())
+        .on('postgres_changes',{event:'*',schema:'public',table:'pl_achievement_reactions'},()=>renderDrinkFeed())
         .subscribe();
 }
 
-async function fetchFeedInteractions(drinkIds) {
-    const blank={ready:true,commentsByDrink:{},commentUsersByDrink:{},reactionsByDrink:{},reactionUsersByDrink:{},myReactions:{}};
-    if (!drinkIds.length) return blank;
+async function fetchFeedInteractions(drinkIds,achievementIds=[]) {
+    const blank={ready:true,commentsByDrink:{},commentUsersByDrink:{},reactionsByDrink:{},reactionUsersByDrink:{},reactionsByAchievement:{},reactionUsersByAchievement:{},myReactions:{}};
+    if (!drinkIds.length && !achievementIds.length) return blank;
 
-    const [commentsRes,reactionsRes] = await Promise.all([
-        sb.from('pl_drink_comments').select('id,drink_id,user_id,body,created_at').in('drink_id',drinkIds).order('created_at',{ascending:true}),
-        sb.from('pl_drink_reactions').select('id,drink_id,user_id,emoji').in('drink_id',drinkIds)
-    ]);
+    const commentsP=drinkIds.length
+        ? sb.from('pl_drink_comments').select('id,drink_id,user_id,body,created_at').in('drink_id',drinkIds).order('created_at',{ascending:true})
+        : Promise.resolve({data:[],error:null});
+    const drinkReactionsP=drinkIds.length
+        ? sb.from('pl_drink_reactions').select('id,drink_id,user_id,emoji').in('drink_id',drinkIds)
+        : Promise.resolve({data:[],error:null});
+    const achReactionsP=achievementIds.length
+        ? sb.from('pl_achievement_reactions').select('id,achievement_id,user_id,emoji').in('achievement_id',achievementIds)
+        : Promise.resolve({data:[],error:null});
+
+    const [commentsRes,reactionsRes,achReactionsRes]=await Promise.all([commentsP,drinkReactionsP,achReactionsP]);
 
     if (commentsRes.error || reactionsRes.error) {
         return {...blank,ready:false};
@@ -82,6 +90,17 @@ async function fetchFeedInteractions(drinkIds) {
         }
     });
 
+    if (!achReactionsRes.error) {
+        (achReactionsRes.data||[]).forEach(r=>{
+            const reactions=(blank.reactionsByAchievement[r.achievement_id] ||= {});
+            const stats=(reactions[r.emoji] ||= {count:0,active:false});
+            stats.count++;
+            const users=(blank.reactionUsersByAchievement[r.achievement_id] ||= {});
+            (users[r.emoji] ||= []).push(r.user_id);
+            if (r.user_id===CU.id) stats.active=true;
+        });
+    }
+
     return blank;
 }
 
@@ -102,11 +121,12 @@ async function renderDrinkFeed() {
     const feed=[...drinkEvents,...achEvents].sort((a,b)=>new Date(b.ts)-new Date(a.ts)).slice(0,30);
     if (!feed.length){el.innerHTML='<div class="empty">Ingen aktivitet ennå.</div>';return;}
     const drinkIds=feed.filter(e=>e.kind==='drink').map(e=>e.drink.id);
-    const interactions=await fetchFeedInteractions(drinkIds);
+    const achievementIds=feed.filter(e=>e.kind==='achievement').map(e=>e.id);
+    const interactions=await fetchFeedInteractions(drinkIds,achievementIds);
 
     const schemaNotice=interactions.ready?'':'<div class="feed-disabled global">Kjør oppdatert schema.sql for å aktivere kommentarer og reaksjoner.</div>';
     el.innerHTML=schemaNotice+feed.map(e=>e.kind==='achievement'
-        ? renderAchievementFeedItem(e,byUser)
+        ? renderAchievementFeedItem(e,byUser,interactions)
         : renderDrinkFeedItem(e.drink,interactions,byUser)
     ).join('');
 }
@@ -136,9 +156,11 @@ function renderDrinkFeedItem(d,interactions,byUser) {
     </div>`;
 }
 
-function renderAchievementFeedItem(event,byUser) {
+function renderAchievementFeedItem(event,byUser,interactions) {
     const user=byUser[event.user_id]||event.user||{username:'Ukjent',color:USER_COLORS[0]};
     const isMe=event.user_id===CU.id;
+    const reactions=interactions?.reactionsByAchievement?.[event.id]||{};
+    const reactionUsers=interactions?.reactionUsersByAchievement?.[event.id]||{};
     return `<div class="feed-item achievement">
         <div class="feed-head">
             ${avatarHtml(user,30,'.78em')}
@@ -148,7 +170,35 @@ function renderAchievementFeedItem(event,byUser) {
             </div>
             <div class="dr"><span class="dg">🏅</span></div>
         </div>
+        ${interactions?.ready?renderAchievementReactions(event.id,reactions,reactionUsers,byUser):''}
     </div>`;
+}
+
+function renderAchievementReactions(achId,reactions,reactionUsers,usersById) {
+    const total=Object.values(reactions).reduce((sum,r)=>sum+(r.count||0),0);
+    const detailsId=`ach:${achId}`;
+    const safeId=esc(achId);
+    return `<div class="feed-actions">${FEED_REACTIONS.map(emoji=>{
+        const stats=reactions[emoji]||{count:0,active:false};
+        return `<button class="react-btn${stats.active?' active':''}" onclick="toggleAchievementReaction('${safeId}','${emoji}')">${emoji} ${stats.count||''}</button>`;
+    }).join('')}${total>0?`<button class="react-detail-btn" onclick="toggleInteractionDetails('${detailsId}')">${openInteractionDetailsId===detailsId?'Skjul reaksjoner':'Reaksjoner'}</button>`:''}</div>
+    ${openInteractionDetailsId===detailsId?renderInteractionDetails(reactionUsers,[],usersById):''}`;
+}
+
+async function toggleAchievementReaction(achId,emoji) {
+    const {data:existing,error:findError}=await sb.from('pl_achievement_reactions')
+        .select('id')
+        .eq('achievement_id',achId)
+        .eq('user_id',CU.id)
+        .eq('emoji',emoji)
+        .maybeSingle();
+    if (findError){showToast('Kjør oppdatert schema.sql for reaksjoner.',false);return;}
+
+    const result=existing
+        ? await sb.from('pl_achievement_reactions').delete().eq('id',existing.id)
+        : await sb.from('pl_achievement_reactions').insert({achievement_id:achId,user_id:CU.id,emoji});
+    if (result.error){showToast('Kunne ikke lagre reaksjon.',false);return;}
+    await renderDrinkFeed();
 }
 
 function renderFeedReactions(drinkId,reactions,reactionUsers,commentUsers,usersById) {
