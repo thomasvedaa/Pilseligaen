@@ -29,6 +29,7 @@ const ACHIEVEMENTS = [
     {id:'spirits10', icon:'🥃', name:'Spritsertifikat', desc:'Totalt 10 liter sprit registrert.', check:s=>s.liters.spirits>=10, progress:s=>`${fmtLiters(Math.min(s.liters.spirits,10))}/10 L`},
     {id:'split_the_g', icon:'🍀', name:'Split the G', desc:'Drakk din første Guinness.', check:s=>s.guinnessCount>=1, progress:s=>`${Math.min(s.guinnessCount,1)}/1`},
     {id:'g_spot', icon:'🎯', name:'Finding th G spot?', desc:'100 Guinness drukket.', check:s=>s.guinnessCount>=100, progress:s=>`${Math.min(s.guinnessCount,100)}/100`},
+    {id:'tur_konge', icon:'👑', name:'Tur konge', desc:'Drakk mest på en gruppetur da turen ble avsluttet.', check:s=>s.turKongeWins>=1, progress:s=>s.turKongeWins>=1?`${s.turKongeWins} turer`:'0/1'},
 
 ];
 
@@ -98,7 +99,7 @@ function streakStats(days) {
     return {current,best,active,last};
 }
 
-function summarizeAchievements(user,drinks) {
+function summarizeAchievements(user,drinks,extra={}) {
     const sorted=[...drinks].sort((a,b)=>new Date(a.ts)-new Date(b.ts));
     const totalGrams=sorted.reduce((sum,d)=>sum+(Number(d.grams)||0),0);
     const totalUnits=totalGrams/ALCOHOL_UNIT_GRAMS;
@@ -172,7 +173,8 @@ function summarizeAchievements(user,drinks) {
         hasAllCategoriesDay,
         maxMonthDays,
         maxMonthBeerLiters,
-        guinnessCount
+        guinnessCount,
+        turKongeWins:extra.turKongeWins||0
     }));
 
     return {
@@ -197,6 +199,7 @@ function summarizeAchievements(user,drinks) {
         maxMonthDays,
         maxMonthBeerLiters,
         guinnessCount,
+        turKongeWins:extra.turKongeWins||0,
         unlockedCount:unlocked.length
     };
 }
@@ -319,21 +322,57 @@ function achievementUnlockStats(summaries) {
 }
 
 async function loadAchievementData() {
-    const [{data:users,error:userError},{data:drinks,error:drinkError}]=await Promise.all([
+    const [
+        {data:users,error:userError},
+        {data:drinks,error:drinkError},
+        endedEventsRes,
+        membersRes
+    ]=await Promise.all([
         sb.from('pl_users').select('*'),
-        sb.from('pl_drinks').select('*')
+        sb.from('pl_drinks').select('*'),
+        sb.from('pl_events').select('*').not('ended_at','is',null),
+        sb.from('pl_event_members').select('event_id,user_id')
     ]);
     if (userError || drinkError) return {error:userError||drinkError};
+
+    const turKongeWins=computeTurKongeWins(endedEventsRes?.data||[],membersRes?.data||[],drinks||[]);
 
     const scopeUsers=await fetchUsersForCurrentScope(users||[]);
     const scopeDrinks=visibleDrinksForScope(drinks||[]);
     const drinksByUser={};
     scopeDrinks.forEach(d=>{(drinksByUser[d.user_id] ||= []).push(d);});
     const summaries=scopeUsers
-        .map(u=>summarizeAchievements(u,drinksByUser[u.id]||[]))
+        .map(u=>summarizeAchievements(u,drinksByUser[u.id]||[],{turKongeWins:turKongeWins[u.id]||0}))
         .sort((a,b)=>b.unlockedCount-a.unlockedCount || b.bestStreak-a.bestStreak || displayName(a.user).localeCompare(displayName(b.user),'no'));
 
     return {users:scopeUsers,drinks:scopeDrinks,summaries,unlockStats:achievementUnlockStats(summaries)};
+}
+
+function computeTurKongeWins(endedEvents,members,drinks) {
+    const wins={};
+    if (!endedEvents.length) return wins;
+    const membersByEvent={};
+    members.forEach(m=>{(membersByEvent[m.event_id] ||= new Set()).add(m.user_id);});
+    endedEvents.forEach(ev=>{
+        const memberSet=membersByEvent[ev.id]||new Set();
+        if (memberSet.size<2) return;
+        const endedAt=new Date(ev.ended_at);
+        const gramsBy={};
+        drinks.forEach(d=>{
+            if (d.event_id!==ev.id) return;
+            if (new Date(d.ts)>endedAt) return;
+            if (!memberSet.has(d.user_id)) return;
+            gramsBy[d.user_id]=(gramsBy[d.user_id]||0)+(Number(d.grams)||0);
+        });
+        const entries=Object.entries(gramsBy);
+        if (!entries.length) return;
+        const max=Math.max(...entries.map(([,g])=>g));
+        if (max<=0) return;
+        entries.filter(([,g])=>g===max).forEach(([uid])=>{
+            wins[uid]=(wins[uid]||0)+1;
+        });
+    });
+    return wins;
 }
 
 function renderStreakBadge(summary) {
@@ -425,6 +464,7 @@ async function renderAchievements() {
         achChannel=sb.channel('achievements-realtime')
             .on('postgres_changes',{event:'*',schema:'public',table:'pl_drinks'},()=>refreshActiveAchievementView())
             .on('postgres_changes',{event:'*',schema:'public',table:'pl_users'},()=>refreshActiveAchievementView())
+            .on('postgres_changes',{event:'*',schema:'public',table:'pl_events'},()=>refreshActiveAchievementView())
             .subscribe();
     }
 
