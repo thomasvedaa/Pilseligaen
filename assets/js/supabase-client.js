@@ -9,6 +9,7 @@ let feedChannel = null;
 let dtCache   = null;
 let eventChannel = null;
 let eventCache = [];
+let allEventsById = {};
 let eventSchemaReady = true;
 let currentEventId = localStorage.getItem('pl_event_filter') || '';
 

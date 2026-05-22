@@ -140,21 +140,18 @@ function authEmailFromUsername(value) {
     return `${safeAuthName(raw)}@${AUTH_EMAIL_DOMAIN}`;
 }
 function eventById(id=currentEventId) {
-    return (eventCache||[]).find(e=>e.id===id)||null;
+    if (!id) return null;
+    return (eventCache||[]).find(e=>e.id===id) || allEventsById[id] || null;
 }
 function eventLabel(id=currentEventId) {
     const event=eventById(id);
     return event ? event.name : 'Totalt';
 }
-function eventIdsForCurrentUser() {
-    return new Set((eventCache||[]).map(e=>e.id));
-}
 function visibleDrinksForScope(drinks) {
     const rows=drinks||[];
     if (!eventSchemaReady) return rows;
     if (currentEventId) return rows.filter(d=>d.event_id===currentEventId);
-    const allowed=eventIdsForCurrentUser();
-    return rows.filter(d=>!d.event_id || allowed.has(d.event_id));
+    return rows;
 }
 function eventMeta(d) {
     if (!eventSchemaReady || !d?.event_id) return '';

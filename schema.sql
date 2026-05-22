@@ -393,7 +393,7 @@ CREATE POLICY "drink_types_delete_self"
 
 CREATE POLICY "events_select_members"
     ON public.pl_events FOR SELECT TO authenticated
-    USING (public.is_event_member(id));
+    USING (true);
 
 CREATE POLICY "events_update_end_trip"
     ON public.pl_events FOR UPDATE TO authenticated
@@ -406,11 +406,11 @@ CREATE POLICY "events_delete_created"
 
 CREATE POLICY "event_members_select_members"
     ON public.pl_event_members FOR SELECT TO authenticated
-    USING (user_id = public.current_profile_id() OR public.is_event_member(event_id));
+    USING (true);
 
 CREATE POLICY "drinks_select_visible"
     ON public.pl_drinks FOR SELECT TO authenticated
-    USING (event_id IS NULL OR public.is_event_member(event_id));
+    USING (true);
 
 CREATE POLICY "drinks_insert_self"
     ON public.pl_drinks FOR INSERT TO authenticated
@@ -422,7 +422,7 @@ CREATE POLICY "drinks_delete_self"
 
 CREATE POLICY "comments_select_visible_drinks"
     ON public.pl_drink_comments FOR SELECT TO authenticated
-    USING (public.can_read_drink(drink_id));
+    USING (true);
 
 CREATE POLICY "comments_insert_self_visible_drink"
     ON public.pl_drink_comments FOR INSERT TO authenticated
@@ -434,7 +434,7 @@ CREATE POLICY "comments_delete_self"
 
 CREATE POLICY "reactions_select_visible_drinks"
     ON public.pl_drink_reactions FOR SELECT TO authenticated
-    USING (public.can_read_drink(drink_id));
+    USING (true);
 
 CREATE POLICY "reactions_insert_self_visible_drink"
     ON public.pl_drink_reactions FOR INSERT TO authenticated

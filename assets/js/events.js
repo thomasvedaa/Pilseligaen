@@ -57,6 +57,7 @@ async function loadEvents() {
     if (error) {
         eventSchemaReady=false;
         eventCache=[];
+        allEventsById={};
         currentEventId='';
         localStorage.removeItem('pl_event_filter');
         updateEventControls();
@@ -64,6 +65,11 @@ async function loadEvents() {
     }
 
     eventSchemaReady=true;
+
+    const {data:everyEvent}=await sb.from('pl_events').select('*');
+    allEventsById={};
+    (everyEvent||[]).forEach(e=>{allEventsById[e.id]=e;});
+
     const ids=[...new Set((members||[]).map(m=>m.event_id))];
     if (!ids.length) {
         eventCache=[];

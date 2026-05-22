@@ -122,7 +122,7 @@ async function handleLogout() {
     localStorage.removeItem('pl_uid');
     localStorage.removeItem('pl_event_filter');
     await sb.auth.signOut();
-    CU=null; dtCache=null; eventCache=[]; currentEventId='';
+    CU=null; dtCache=null; eventCache=[]; allEventsById={}; currentEventId='';
     document.getElementById('app').style.display='none';
     document.getElementById('auth-screen').style.display='flex';
     document.getElementById('li-user').value='';
