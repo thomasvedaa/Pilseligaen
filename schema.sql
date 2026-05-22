@@ -426,7 +426,7 @@ CREATE POLICY "comments_select_visible_drinks"
 
 CREATE POLICY "comments_insert_self_visible_drink"
     ON public.pl_drink_comments FOR INSERT TO authenticated
-    WITH CHECK (user_id = public.current_profile_id() AND public.can_read_drink(drink_id));
+    WITH CHECK (user_id = public.current_profile_id());
 
 CREATE POLICY "comments_delete_self"
     ON public.pl_drink_comments FOR DELETE TO authenticated
@@ -438,7 +438,7 @@ CREATE POLICY "reactions_select_visible_drinks"
 
 CREATE POLICY "reactions_insert_self_visible_drink"
     ON public.pl_drink_reactions FOR INSERT TO authenticated
-    WITH CHECK (user_id = public.current_profile_id() AND public.can_read_drink(drink_id));
+    WITH CHECK (user_id = public.current_profile_id());
 
 CREATE POLICY "reactions_delete_self"
     ON public.pl_drink_reactions FOR DELETE TO authenticated
