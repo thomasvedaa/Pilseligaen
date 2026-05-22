@@ -2,6 +2,8 @@
    DASHBOARD
 ════════════════════════════════════════════ */
 const FEED_REACTIONS = ['🔥','😂','👏','💀','🍺'];
+const FEED_PAGE_SIZE = 30;
+let feedLimit = FEED_PAGE_SIZE;
 let openInteractionDetailsId = null;
 
 function renderBeerGlassHtml(totalGrams, maxGrams, name, sublabel, lastGrams) {
@@ -67,6 +69,7 @@ async function renderDashboard() {
     document.getElementById('dash-stats').innerHTML='';
     document.getElementById('recent-drinks').innerHTML='<div class="vload"><div class="spinner"></div>Laster…</div>';
     document.getElementById('drink-feed').innerHTML='<div class="vload"><div class="spinner"></div>Laster…</div>';
+    feedLimit=FEED_PAGE_SIZE;
     ensureFeedRealtime();
     renderDrinkFeed();
 
@@ -225,17 +228,25 @@ async function renderDrinkFeed() {
     const drinkEvents=allDrinks.map(d=>({id:`drink:${d.id}`,kind:'drink',ts:d.ts,drink:d}));
     const allAchievementEvents=typeof achievementFeedEvents==='function' ? achievementFeedEvents(scopeUsers,allVisibleDrinks,endedEvents||[],members||[]) : [];
     const achEvents=currentEventId ? allAchievementEvents.filter(e=>e.event_id===currentEventId) : allAchievementEvents;
-    const feed=[...drinkEvents,...achEvents].sort((a,b)=>new Date(b.ts)-new Date(a.ts)).slice(0,30);
+    const sortedFeed=[...drinkEvents,...achEvents].sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+    const feed=sortedFeed.slice(0,feedLimit);
+    const hasMore=sortedFeed.length>feed.length;
     if (!feed.length){el.innerHTML='<div class="empty">Ingen aktivitet ennå.</div>';return;}
     const drinkIds=feed.filter(e=>e.kind==='drink').map(e=>e.drink.id);
     const achievementIds=feed.filter(e=>e.kind==='achievement').map(e=>e.id);
     const interactions=await fetchFeedInteractions(drinkIds,achievementIds);
 
     const schemaNotice=interactions.ready?'':'<div class="feed-disabled global">Kjør oppdatert schema.sql for å aktivere kommentarer og reaksjoner.</div>';
+    const loadMoreBtn=hasMore?'<div class="feed-load-more"><button class="btn btn-p" onclick="loadMoreFeed()">Last inn flere</button></div>':'';
     el.innerHTML=schemaNotice+feed.map(e=>e.kind==='achievement'
         ? renderAchievementFeedItem(e,byUser,interactions)
         : renderDrinkFeedItem(e.drink,interactions,byUser)
-    ).join('');
+    ).join('')+loadMoreBtn;
+}
+
+async function loadMoreFeed() {
+    feedLimit+=FEED_PAGE_SIZE;
+    await renderDrinkFeed();
 }
 
 function renderDrinkFeedItem(d,interactions,byUser) {

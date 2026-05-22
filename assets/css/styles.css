@@ -654,6 +654,7 @@ h2 {
 .manage-drink:last-child { padding-bottom:0; }
 
 /* ── FEED ──────────────────────────────────────────────────────────────── */
+.feed-load-more { display:flex; justify-content:center; padding:16px 0 4px; }
 .feed-item { padding:14px 0; border-bottom:1px solid var(--border); }
 .feed-item:first-child { padding-top: 4px; }
 .feed-item:last-child { border-bottom:none; padding-bottom: 4px; }
