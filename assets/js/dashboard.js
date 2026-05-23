@@ -212,11 +212,12 @@ async function fetchFeedInteractions(drinkIds,achievementIds=[]) {
 
 async function renderDrinkFeed() {
     const el=document.getElementById('drink-feed');
-    const [{data:drinks,error},{data:users},{data:endedEvents},{data:members}] = await Promise.all([
+    const [{data:drinks,error},{data:users},{data:endedEvents},{data:members},{data:comments}] = await Promise.all([
         sb.from('pl_drinks').select('*').order('ts',{ascending:false}),
         sb.from('pl_users').select(PROFILE_SELECT),
         sb.from('pl_events').select('*').not('ended_at','is',null),
-        sb.from('pl_event_members').select('event_id,user_id')
+        sb.from('pl_event_members').select('event_id,user_id'),
+        sb.from('pl_drink_comments').select('user_id,created_at')
     ]);
     if (error){el.innerHTML=`<div class="empty">Feil: ${esc(error.message)}</div>`;return;}
 
@@ -226,11 +227,12 @@ async function renderDrinkFeed() {
     const allVisibleDrinks=drinks||[];
     const allDrinks=visibleDrinksForScope(allVisibleDrinks);
     const drinkEvents=allDrinks.map(d=>({id:`drink:${d.id}`,kind:'drink',ts:d.ts,drink:d}));
-    const allAchievementEvents=typeof achievementFeedEvents==='function' ? achievementFeedEvents(scopeUsers,allVisibleDrinks,endedEvents||[],members||[]) : [];
+    const allAchievementEvents=typeof achievementFeedEvents==='function'
+        ? achievementFeedEvents(scopeUsers,allVisibleDrinks,endedEvents||[],members||[],comments||[])
+        : [];
     const achEvents=currentEventId ? allAchievementEvents.filter(e=>e.event_id===currentEventId) : allAchievementEvents;
     const sortedFeed=[...drinkEvents,...achEvents].sort((a,b)=>new Date(b.ts)-new Date(a.ts));
-    const feed=sortedFeed.slice(0,feedLimit);
-    const hasMore=sortedFeed.length>feed.length;
+    const feed=sortedFeed.slice(0,feedLimit);    const hasMore=sortedFeed.length>feed.length;
     if (!feed.length){el.innerHTML='<div class="empty">Ingen aktivitet ennå.</div>';return;}
     const drinkIds=feed.filter(e=>e.kind==='drink').map(e=>e.drink.id);
     const achievementIds=feed.filter(e=>e.kind==='achievement').map(e=>e.id);

@@ -223,8 +223,12 @@ function summarizeAchievements(user,drinks,extra={}) {
     };
 }
 
-function achievementUnlockEvents(user,drinks) {
+function achievementUnlockEvents(user,drinks,comments=[]) {
     const sorted=[...drinks].sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+    const userComments=(comments||[])
+        .filter(c=>c.user_id===user.id)
+        .sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+
     const events=[];
     const unlocked=new Set();
     const days=new Set();
@@ -239,7 +243,7 @@ function achievementUnlockEvents(user,drinks) {
     let dayRun=0;
     let guinnessCount=0;
 
-    const unlock=(id,drink)=>{
+    const unlock=(id,item)=>{
         if (unlocked.has(id)) return;
         const achievement=achievementById(id);
         if (!achievement) return;
@@ -250,11 +254,15 @@ function achievementUnlockEvents(user,drinks) {
             user_id:user.id,
             user,
             achievement,
-            event_id:drink.event_id||'',
-            ts:drink.created_at||drink.ts,
-            drink_ts:drink.ts
+            event_id:item.event_id||'',
+            ts:item.created_at||item.ts,
+            drink_ts:item.ts||item.created_at
         });
     };
+
+    if (userComments.length) {
+        unlock('first_comment',userComments[0]);
+    }
 
     sorted.forEach((d,i)=>{
         const k=dayKey(d.ts);
@@ -356,13 +364,13 @@ function computeTripWinnersPerEvent(endedEvents,members,drinks) {
     return result;
 }
 
-function achievementFeedEvents(users,drinks,endedEvents=[],members=[]) {
+function achievementFeedEvents(users,drinks,endedEvents=[],members=[],comments=[]) {
     const drinksByUser={};
     (drinks||[]).forEach(d=>{(drinksByUser[d.user_id] ||= []).push(d);});
     const userById={};
     (users||[]).forEach(u=>{userById[u.id]=u;});
 
-    const drinkBased=(users||[]).flatMap(u=>achievementUnlockEvents(u,drinksByUser[u.id]||[]));
+    const drinkBased=(users||[]).flatMap(u=>achievementUnlockEvents(u,drinksByUser[u.id]||[],comments||[]));
 
     const tripBased=[];
     computeTripWinnersPerEvent(endedEvents,members,drinks||[]).forEach(({event,turKonge,edruSjafor})=>{
