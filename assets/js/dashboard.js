@@ -230,8 +230,9 @@ async function renderDrinkFeed() {
     const allAchievementEvents=typeof achievementFeedEvents==='function'
         ? achievementFeedEvents(scopeUsers,allVisibleDrinks,endedEvents||[],members||[],comments||[])
         : [];
-    const achEvents=currentEventId ? allAchievementEvents.filter(e=>e.event_id===currentEventId) : allAchievementEvents;
-    const sortedFeed=[...drinkEvents,...achEvents].sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+    const achEvents=currentEventId
+        ? allAchievementEvents.filter(e=>e.event_id===currentEventId || e.achievement?.id==='first_comment')
+        : allAchievementEvents;    const sortedFeed=[...drinkEvents,...achEvents].sort((a,b)=>new Date(b.ts)-new Date(a.ts));
     const feed=sortedFeed.slice(0,feedLimit);    const hasMore=sortedFeed.length>feed.length;
     if (!feed.length){el.innerHTML='<div class="empty">Ingen aktivitet ennå.</div>';return;}
     const drinkIds=feed.filter(e=>e.kind==='drink').map(e=>e.drink.id);
