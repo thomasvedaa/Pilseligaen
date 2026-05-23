@@ -6,6 +6,7 @@ let achProfileUserId=null;
 
 const ACHIEVEMENTS = [
     {id:'first', icon:'🥂', name:'Første skål', desc:'Registrerte sin første drink.', check:s=>s.totalDrinks>=1, progress:s=>`${Math.min(s.totalDrinks,1)}/1`},
+    {id:'first_comment', icon:'💬', name:'Si hei!', desc:'Legg igjen en kommentar.', check:s=>s.hasCommented, progress:s=>s.hasCommented?'Klar':'0/1'},
     {id:'units10', icon:'🥉', name:'Fersk', desc:'10 alkoholenheter totalt.', check:s=>s.totalUnits>=10, progress:s=>`${fmtAchievementUnits(Math.min(s.totalUnits,10))}/10 enheter`},
     {id:'units100', icon:'🥈', name:'Godt i gang', desc:'100 alkoholenheter totalt.', check:s=>s.totalUnits>=100, progress:s=>`${fmtAchievementUnits(Math.min(s.totalUnits,100))}/100 enheter`},
     {id:'units1000', icon:'🥇', name:'Veteran', desc:'1000 alkoholenheter totalt.', check:s=>s.totalUnits>=1000, progress:s=>`${fmtAchievementUnits(Math.min(s.totalUnits,1000))}/1000 enheter`},
@@ -102,6 +103,7 @@ function streakStats(days) {
 }
 
 function summarizeAchievements(user,drinks,extra={}) {
+    const hasCommented=!!extra.hasCommented;
     const sorted=[...drinks].sort((a,b)=>new Date(a.ts)-new Date(b.ts));
     const totalGrams=sorted.reduce((sum,d)=>sum+(Number(d.grams)||0),0);
     const totalUnits=totalGrams/ALCOHOL_UNIT_GRAMS;
@@ -182,6 +184,7 @@ function summarizeAchievements(user,drinks,extra={}) {
         maxMonthBeerLiters,
         guinnessCount,
         hasEnergyBeer,
+        hasCommented,
         turKongeWins:extra.turKongeWins||0,
         edruSjaforWins:extra.edruSjaforWins||0
     }));
@@ -213,6 +216,7 @@ function summarizeAchievements(user,drinks,extra={}) {
         maxMonthBeerLiters,
         guinnessCount,
         hasEnergyBeer,
+        hasCommented,
         turKongeWins:extra.turKongeWins||0,
         edruSjaforWins:extra.edruSjaforWins||0,
         unlockedCount:unlocked.length
@@ -391,16 +395,19 @@ async function loadAchievementData() {
     const [
         {data:users,error:userError},
         {data:drinks,error:drinkError},
+        commentsRes,
         endedEventsRes,
         membersRes
     ]=await Promise.all([
         sb.from('pl_users').select(PROFILE_SELECT),
         sb.from('pl_drinks').select('*'),
+        sb.from('pl_drink_comments').select('user_id'),
         sb.from('pl_events').select('*').not('ended_at','is',null),
         sb.from('pl_event_members').select('event_id,user_id')
     ]);
     if (userError || drinkError) return {error:userError||drinkError};
 
+    const commenters=new Set((commentsRes?.data||[]).map(c=>c.user_id));
     const tripStandings=computeTripStandings(endedEventsRes?.data||[],membersRes?.data||[],drinks||[]);
 
     const scopeUsers=users||[];
@@ -409,6 +416,7 @@ async function loadAchievementData() {
     scopeDrinks.forEach(d=>{(drinksByUser[d.user_id] ||= []).push(d);});
     const summaries=scopeUsers
         .map(u=>summarizeAchievements(u,drinksByUser[u.id]||[],{
+            hasCommented:commenters.has(u.id),
             turKongeWins:tripStandings.turKonge[u.id]||0,
             edruSjaforWins:tripStandings.edruSjafor[u.id]||0
         }))
@@ -544,6 +552,7 @@ async function renderAchievements() {
     if (!achChannel) {
         achChannel=sb.channel('achievements-realtime')
             .on('postgres_changes',{event:'*',schema:'public',table:'pl_drinks'},()=>refreshActiveAchievementView())
+            .on('postgres_changes',{event:'*',schema:'public',table:'pl_drink_comments'},()=>refreshActiveAchievementView())
             .on('postgres_changes',{event:'*',schema:'public',table:'pl_users'},()=>refreshActiveAchievementView())
             .on('postgres_changes',{event:'*',schema:'public',table:'pl_events'},()=>refreshActiveAchievementView())
             .subscribe();
