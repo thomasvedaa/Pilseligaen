@@ -11,6 +11,10 @@ let eventChannel = null;
 let eventCache = [];
 let allEventsById = {};
 let eventSchemaReady = true;
+let seasonChannel = null;
+let seasonCache = [];
+let seasonSchemaReady = true;
+let currentSeasonId = localStorage.getItem('pl_season_filter') || '';
 let currentEventId = localStorage.getItem('pl_event_filter') || '';
 
 function initSupabase(anonKey) {

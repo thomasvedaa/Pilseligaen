@@ -539,7 +539,7 @@ function renderProfileList(summaries) {
 }
 
 function achievementsNavButton() {
-    return Array.from(document.querySelectorAll('.nav-item')).find(b=>(b.getAttribute('onclick')||'').includes("'achievements'"))||null;
+    return Array.from(document.querySelectorAll('[data-view]')).find(b=>b.dataset.view==='achievements')||null;
 }
 
 function backToAchievements() {
@@ -588,8 +588,7 @@ async function renderAchievements() {
 
 async function openAchievementProfile(userId) {
     achProfileUserId=userId;
-    showView('profile');
-    await renderAchievementProfile(userId);
+    await showView('profile');
 }
 
 async function renderAchievementProfile(userId=achProfileUserId) {

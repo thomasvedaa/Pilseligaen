@@ -13,16 +13,21 @@ CREATE TABLE IF NOT EXISTS public.pl_users (
     username_lc TEXT        UNIQUE NOT NULL,   -- lowercase, brukes for case-insensitive innlogging
     password    TEXT,                           -- legacy: ikke bruk for nye innlogginger
     color       TEXT        NOT NULL DEFAULT '#f0a500',
+    is_admin    BOOLEAN     NOT NULL DEFAULT FALSE,
     created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
 ALTER TABLE public.pl_users
     ADD COLUMN IF NOT EXISTS nickname TEXT,
     ADD COLUMN IF NOT EXISTS avatar_url TEXT,
-    ADD COLUMN IF NOT EXISTS auth_user_id UUID UNIQUE REFERENCES auth.users(id);
+    ADD COLUMN IF NOT EXISTS auth_user_id UUID UNIQUE REFERENCES auth.users(id),
+    ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE;
 
 ALTER TABLE public.pl_users
     ALTER COLUMN password DROP NOT NULL;
+
+-- Sett admin i Supabase SQL Editor, f.eks.:
+-- UPDATE public.pl_users SET is_admin = TRUE WHERE username_lc = 'brukernavn';
 
 UPDATE public.pl_users
 SET password = NULL
@@ -55,6 +60,27 @@ CREATE TABLE IF NOT EXISTS public.pl_events (
 
 ALTER TABLE public.pl_events
     ADD COLUMN IF NOT EXISTS ended_at TIMESTAMPTZ;
+
+-- SESONGER
+CREATE TABLE IF NOT EXISTS public.pl_seasons (
+    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    name        TEXT        NOT NULL,
+    slug        TEXT        UNIQUE NOT NULL,
+    starts_at   TIMESTAMPTZ NOT NULL,
+    ends_at     TIMESTAMPTZ NOT NULL,
+    is_active   BOOLEAN     NOT NULL DEFAULT TRUE,
+    created_by  UUID        REFERENCES public.pl_users(id) ON DELETE SET NULL,
+    created_at  TIMESTAMPTZ DEFAULT NOW(),
+    CHECK (ends_at > starts_at)
+);
+
+INSERT INTO public.pl_seasons (name, slug, starts_at, ends_at, is_active)
+VALUES ('Sommer 2026', 'sommer-2026', '2026-06-01 00:00:00+02', '2026-08-17 00:00:00+02', TRUE)
+ON CONFLICT (slug) DO UPDATE
+SET name = EXCLUDED.name,
+    starts_at = EXCLUDED.starts_at,
+    ends_at = EXCLUDED.ends_at,
+    is_active = TRUE;
 
 CREATE TABLE IF NOT EXISTS public.pl_event_members (
     event_id    UUID        NOT NULL REFERENCES public.pl_events(id) ON DELETE CASCADE,
@@ -127,6 +153,8 @@ CREATE INDEX IF NOT EXISTS idx_pl_drinks_ts      ON public.pl_drinks(ts);
 CREATE INDEX IF NOT EXISTS idx_pl_drinks_event_id ON public.pl_drinks(event_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_pl_users_auth_user_id ON public.pl_users(auth_user_id);
 CREATE INDEX IF NOT EXISTS idx_pl_events_code_lc ON public.pl_events(code_lc);
+CREATE INDEX IF NOT EXISTS idx_pl_seasons_slug ON public.pl_seasons(slug);
+CREATE INDEX IF NOT EXISTS idx_pl_seasons_range ON public.pl_seasons(starts_at,ends_at);
 CREATE INDEX IF NOT EXISTS idx_pl_event_members_user_id ON public.pl_event_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_pl_event_members_event_id ON public.pl_event_members(event_id);
 CREATE INDEX IF NOT EXISTS idx_pl_drink_comments_drink_id ON public.pl_drink_comments(drink_id);
@@ -140,6 +168,7 @@ CREATE INDEX IF NOT EXISTS idx_pl_achievement_comments_aid ON public.pl_achievem
 ALTER TABLE public.pl_users       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pl_drink_types ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pl_events      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pl_seasons     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pl_event_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pl_drinks      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pl_drink_comments ENABLE ROW LEVEL SECURITY;
@@ -161,6 +190,8 @@ AS $$
     LIMIT 1
 $$;
 
+DROP FUNCTION IF EXISTS public.get_my_profile();
+
 CREATE OR REPLACE FUNCTION public.get_my_profile()
 RETURNS TABLE (
     id UUID,
@@ -168,6 +199,7 @@ RETURNS TABLE (
     nickname TEXT,
     avatar_url TEXT,
     color TEXT,
+    is_admin BOOLEAN,
     created_at TIMESTAMPTZ
 )
 LANGUAGE SQL
@@ -175,10 +207,25 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-    SELECT u.id, u.username, u.nickname, u.avatar_url, u.color, u.created_at
+    SELECT u.id, u.username, u.nickname, u.avatar_url, u.color, u.is_admin, u.created_at
     FROM public.pl_users u
     WHERE u.auth_user_id = (SELECT auth.uid())
     LIMIT 1
+$$;
+
+CREATE OR REPLACE FUNCTION public.current_profile_is_admin()
+RETURNS BOOLEAN
+LANGUAGE SQL
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+    SELECT COALESCE((
+        SELECT is_admin
+        FROM public.pl_users
+        WHERE auth_user_id = (SELECT auth.uid())
+        LIMIT 1
+    ), FALSE)
 $$;
 
 CREATE OR REPLACE FUNCTION public.is_event_member(event_uuid UUID)
@@ -298,12 +345,13 @@ $$;
 REVOKE ALL ON TABLE public.pl_users FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.pl_drink_types FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.pl_events FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.pl_seasons FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.pl_event_members FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.pl_drinks FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.pl_drink_comments FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.pl_drink_reactions FROM PUBLIC, anon, authenticated;
 
-GRANT SELECT (id,username,nickname,avatar_url,color,created_at) ON public.pl_users TO authenticated;
+GRANT SELECT (id,username,nickname,avatar_url,color,is_admin,created_at) ON public.pl_users TO authenticated;
 GRANT INSERT (username,nickname,avatar_url,auth_user_id,username_lc,color) ON public.pl_users TO authenticated;
 GRANT UPDATE (nickname,avatar_url,color) ON public.pl_users TO authenticated;
 
@@ -311,18 +359,21 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.pl_drink_types TO authenticated;
 GRANT SELECT ON public.pl_events TO authenticated;
 GRANT UPDATE (ended_at) ON public.pl_events TO authenticated;
 GRANT DELETE ON public.pl_events TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.pl_seasons TO authenticated;
 GRANT SELECT ON public.pl_event_members TO authenticated;
 GRANT SELECT, INSERT, DELETE ON public.pl_drinks TO authenticated;
 GRANT SELECT, INSERT, DELETE ON public.pl_drink_comments TO authenticated;
 GRANT SELECT, INSERT, DELETE ON public.pl_drink_reactions TO authenticated;
 
 REVOKE EXECUTE ON FUNCTION public.current_profile_id() FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.current_profile_is_admin() FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION public.get_my_profile() FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION public.is_event_member(UUID) FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION public.can_read_drink(UUID) FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION public.create_event_with_code(TEXT,TEXT) FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION public.join_event_by_code(TEXT) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.current_profile_id() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.current_profile_is_admin() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_my_profile() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.is_event_member(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.can_read_drink(UUID) TO authenticated;
@@ -333,6 +384,7 @@ GRANT EXECUTE ON FUNCTION public.join_event_by_code(TEXT) TO authenticated;
 DROP POLICY IF EXISTS "open_access_users"        ON public.pl_users;
 DROP POLICY IF EXISTS "open_access_drink_types"  ON public.pl_drink_types;
 DROP POLICY IF EXISTS "open_access_events"       ON public.pl_events;
+DROP POLICY IF EXISTS "open_access_seasons"      ON public.pl_seasons;
 DROP POLICY IF EXISTS "open_access_event_members" ON public.pl_event_members;
 DROP POLICY IF EXISTS "open_access_drinks"       ON public.pl_drinks;
 DROP POLICY IF EXISTS "open_access_drink_comments" ON public.pl_drink_comments;
@@ -350,6 +402,10 @@ DROP POLICY IF EXISTS "drink_types_delete_self" ON public.pl_drink_types;
 DROP POLICY IF EXISTS "events_select_members"     ON public.pl_events;
 DROP POLICY IF EXISTS "events_update_end_trip"    ON public.pl_events;
 DROP POLICY IF EXISTS "events_delete_created"     ON public.pl_events;
+DROP POLICY IF EXISTS "seasons_select_authenticated" ON public.pl_seasons;
+DROP POLICY IF EXISTS "seasons_insert_admin" ON public.pl_seasons;
+DROP POLICY IF EXISTS "seasons_update_admin" ON public.pl_seasons;
+DROP POLICY IF EXISTS "seasons_delete_admin" ON public.pl_seasons;
 DROP POLICY IF EXISTS "event_members_select_members" ON public.pl_event_members;
 DROP POLICY IF EXISTS "drinks_select_visible" ON public.pl_drinks;
 DROP POLICY IF EXISTS "drinks_insert_self" ON public.pl_drinks;
@@ -389,7 +445,7 @@ CREATE POLICY "drink_types_update_self"
 
 CREATE POLICY "drink_types_delete_self"
     ON public.pl_drink_types FOR DELETE TO authenticated
-    USING (created_by = public.current_profile_id());
+    USING (created_by = public.current_profile_id() OR public.current_profile_is_admin());
 
 CREATE POLICY "events_select_members"
     ON public.pl_events FOR SELECT TO authenticated
@@ -397,12 +453,29 @@ CREATE POLICY "events_select_members"
 
 CREATE POLICY "events_update_end_trip"
     ON public.pl_events FOR UPDATE TO authenticated
-    USING (created_by = public.current_profile_id())
-    WITH CHECK (created_by = public.current_profile_id());
+    USING (created_by = public.current_profile_id() OR public.current_profile_is_admin())
+    WITH CHECK (created_by = public.current_profile_id() OR public.current_profile_is_admin());
 
 CREATE POLICY "events_delete_created"
     ON public.pl_events FOR DELETE TO authenticated
-    USING (created_by = public.current_profile_id());
+    USING (created_by = public.current_profile_id() OR public.current_profile_is_admin());
+
+CREATE POLICY "seasons_select_authenticated"
+    ON public.pl_seasons FOR SELECT TO authenticated
+    USING (true);
+
+CREATE POLICY "seasons_insert_admin"
+    ON public.pl_seasons FOR INSERT TO authenticated
+    WITH CHECK (public.current_profile_is_admin());
+
+CREATE POLICY "seasons_update_admin"
+    ON public.pl_seasons FOR UPDATE TO authenticated
+    USING (public.current_profile_is_admin())
+    WITH CHECK (public.current_profile_is_admin());
+
+CREATE POLICY "seasons_delete_admin"
+    ON public.pl_seasons FOR DELETE TO authenticated
+    USING (public.current_profile_is_admin());
 
 CREATE POLICY "event_members_select_members"
     ON public.pl_event_members FOR SELECT TO authenticated
@@ -418,7 +491,7 @@ CREATE POLICY "drinks_insert_self"
 
 CREATE POLICY "drinks_delete_self"
     ON public.pl_drinks FOR DELETE TO authenticated
-    USING (user_id = public.current_profile_id());
+    USING (user_id = public.current_profile_id() OR public.current_profile_is_admin());
 
 CREATE POLICY "comments_select_visible_drinks"
     ON public.pl_drink_comments FOR SELECT TO authenticated
@@ -430,7 +503,7 @@ CREATE POLICY "comments_insert_self_visible_drink"
 
 CREATE POLICY "comments_delete_self"
     ON public.pl_drink_comments FOR DELETE TO authenticated
-    USING (user_id = public.current_profile_id());
+    USING (user_id = public.current_profile_id() OR public.current_profile_is_admin());
 
 CREATE POLICY "reactions_select_visible_drinks"
     ON public.pl_drink_reactions FOR SELECT TO authenticated
@@ -442,7 +515,7 @@ CREATE POLICY "reactions_insert_self_visible_drink"
 
 CREATE POLICY "reactions_delete_self"
     ON public.pl_drink_reactions FOR DELETE TO authenticated
-    USING (user_id = public.current_profile_id());
+    USING (user_id = public.current_profile_id() OR public.current_profile_is_admin());
 
 CREATE POLICY "open_access_achievement_reactions"
     ON public.pl_achievement_reactions FOR ALL TO anon, authenticated
@@ -474,6 +547,13 @@ BEGIN
         WHERE pubname='supabase_realtime' AND schemaname='public' AND tablename='pl_event_members'
     ) THEN
         ALTER PUBLICATION supabase_realtime ADD TABLE public.pl_event_members;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables
+        WHERE pubname='supabase_realtime' AND schemaname='public' AND tablename='pl_seasons'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.pl_seasons;
     END IF;
 
     IF NOT EXISTS (

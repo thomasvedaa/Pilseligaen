@@ -22,18 +22,68 @@ function eventOptionsHtml(emptyLabel='Totalt') {
         .join('');
 }
 
+function scopeOptionsHtml(emptyLabel='Totalt') {
+    const eventOptions=(eventCache||[])
+        .map(e=>`<option value="event:${e.id}">${esc(e.name)}</option>`)
+        .join('');
+    const eventGroup=eventOptions?`<optgroup label="Turer">${eventOptions}</optgroup>`:'';
+    return `<option value="">${emptyLabel}</option>${seasonOptionsHtml()}${eventGroup}`;
+}
+
+function scopeSelectValue() {
+    if (currentSeasonId) return `season:${currentSeasonId}`;
+    if (currentEventId) return `event:${currentEventId}`;
+    return '';
+}
+
+function summerSeasonScopeKey() {
+    const season=seasonById(SUMMER_2026_SEASON.slug) || SUMMER_2026_SEASON;
+    return seasonKey(season) || SUMMER_2026_SEASON.slug;
+}
+
+function isSummerSeasonScope() {
+    if (!currentSeasonId) return false;
+    const season=seasonById(currentSeasonId);
+    return currentSeasonId===SUMMER_2026_SEASON.slug
+        || season?.slug===SUMMER_2026_SEASON.slug
+        || season?.id===SUMMER_2026_SEASON.id;
+}
+
+function updateDashboardScopeToggle() {
+    const btn=document.getElementById('dashboard-scope-toggle');
+    if (!btn) return;
+
+    const active=isSummerSeasonScope();
+    const state=document.getElementById('dashboard-scope-state');
+    const next=document.getElementById('dashboard-scope-next');
+    const seasonName=seasonLabel(SUMMER_2026_SEASON.slug);
+    const currentLabel=active ? seasonName : (currentEventId ? eventLabel(currentEventId) : 'Totalt');
+    const nextLabel=active ? 'Bytt til totalen' : `Bytt til ${seasonName}`;
+
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', active?'true':'false');
+    btn.title=nextLabel;
+    if (state) state.textContent=currentLabel;
+    if (next) next.textContent=nextLabel;
+}
+
 function updateEventControls() {
     const validIds=new Set((eventCache||[]).map(e=>e.id));
     if (currentEventId && !validIds.has(currentEventId)) {
         currentEventId='';
         localStorage.removeItem('pl_event_filter');
     }
+    const validSeasonIds=new Set((seasonCache||[]).map(seasonKey));
+    if (currentSeasonId && !validSeasonIds.has(currentSeasonId)) {
+        currentSeasonId='';
+        localStorage.removeItem('pl_season_filter');
+    }
 
     const filter=document.getElementById('event-filter');
     if (filter) {
-        filter.innerHTML=eventSchemaReady?eventOptionsHtml('Totalt'):'<option value="">Eventer mangler</option>';
-        filter.value=currentEventId;
-        filter.disabled=!eventSchemaReady;
+        filter.innerHTML=scopeOptionsHtml('Totalt');
+        filter.value=scopeSelectValue();
+        filter.disabled=!eventSchemaReady && !seasonCache.length;
     }
 
     const logEvent=document.getElementById('log-event');
@@ -44,7 +94,8 @@ function updateEventControls() {
     }
 
     const label=document.getElementById('event-active-label');
-    if (label) label.textContent=eventLabel();
+    if (label) label.textContent=scopeLabel();
+    updateDashboardScopeToggle();
 }
 
 async function loadEvents() {
@@ -132,10 +183,27 @@ async function refreshActiveScope() {
 }
 
 async function setEventFilter(value) {
-    currentEventId=value||'';
+    const raw=value||'';
+    if (raw.startsWith('season:')) {
+        currentSeasonId=raw.slice('season:'.length);
+        currentEventId='';
+    } else if (raw.startsWith('event:')) {
+        currentEventId=raw.slice('event:'.length);
+        currentSeasonId='';
+    } else {
+        currentEventId=raw;
+        currentSeasonId='';
+    }
+
     if (currentEventId) localStorage.setItem('pl_event_filter',currentEventId);
     else localStorage.removeItem('pl_event_filter');
+    if (currentSeasonId) localStorage.setItem('pl_season_filter',currentSeasonId);
+    else localStorage.removeItem('pl_season_filter');
     await refreshActiveScope();
+}
+
+async function toggleDashboardSeasonScope() {
+    await setEventFilter(isSummerSeasonScope() ? '' : `season:${summerSeasonScopeKey()}`);
 }
 
 async function activateEvent(eventId) {
@@ -146,7 +214,9 @@ async function activateEvent(eventId) {
 async function afterEventJoined(event) {
     await loadEvents();
     currentEventId=event.id;
+    currentSeasonId='';
     localStorage.setItem('pl_event_filter',currentEventId);
+    localStorage.removeItem('pl_season_filter');
     updateEventControls();
     await renderEvents();
     await refreshActiveScope();
@@ -256,7 +326,7 @@ async function deleteTrip(eventId) {
 }
 
 async function fetchUsersForCurrentScope(users) {
-    if (!eventSchemaReady || !currentEventId) return users||[];
+    if (currentSeasonId || !eventSchemaReady || !currentEventId) return users||[];
     const {data,error}=await sb.from('pl_event_members').select('user_id').eq('event_id',currentEventId);
     if (error) return users||[];
     const ids=new Set((data||[]).map(m=>m.user_id));

@@ -7,18 +7,30 @@ function showAuthTab(tab, btn) {
     document.getElementById('register-form').style.display = tab==='register' ? 'block' : 'none';
 }
 
+async function withAdminFlag(profile) {
+    if (!profile) return profile;
+    if (Object.prototype.hasOwnProperty.call(profile,'is_admin')) return profile;
+    try {
+        const {data,error}=await sb.from('pl_users').select('is_admin').eq('id',profile.id).maybeSingle();
+        if (!error && data && typeof data.is_admin==='boolean') return {...profile,is_admin:data.is_admin};
+    } catch {}
+    return {...profile,is_admin:false};
+}
+
 async function loadProfileForAuthUser(authUserId) {
     if (!authUserId) return {data:null,error:new Error('Mangler auth-bruker.')};
     const result=await sb.rpc('get_my_profile').single();
-    if (!result.error && result.data) return result;
+    if (!result.error && result.data) return {...result,data:await withAdminFlag(result.data)};
 
     const msg=String(result.error?.message||'').toLowerCase();
     if (!msg.includes('function') && !msg.includes('schema cache')) return result;
 
-    return sb.from('pl_users')
+    const fallback=await sb.from('pl_users')
         .select(PROFILE_SELECT)
         .eq('auth_user_id',authUserId)
         .single();
+    if (!fallback.error && fallback.data) return {...fallback,data:await withAdminFlag(fallback.data)};
+    return fallback;
 }
 
 function authMessage(error) {
@@ -36,6 +48,7 @@ function cleanupRealtime() {
     if (feedChannel){sb.removeChannel(feedChannel);feedChannel=null;}
     if (typeof achChannel!=='undefined' && achChannel){sb.removeChannel(achChannel);achChannel=null;}
     if (eventChannel){sb.removeChannel(eventChannel);eventChannel=null;}
+    if (seasonChannel){sb.removeChannel(seasonChannel);seasonChannel=null;}
 }
 
 async function handleLogin() {
@@ -110,7 +123,7 @@ async function handleRegister() {
     localStorage.removeItem('pl_uid');
     if (authData.session) {
         document.getElementById('auth-screen').style.display='none';
-        await startApp(data);
+        await startApp(await withAdminFlag(data));
     } else {
         e.textContent='Konto opprettet. Logg inn etter at brukeren er bekreftet i Supabase Auth.';
     }
@@ -121,8 +134,10 @@ async function handleLogout() {
     if (typeof achProfileUserId!=='undefined') achProfileUserId=null;
     localStorage.removeItem('pl_uid');
     localStorage.removeItem('pl_event_filter');
+    localStorage.removeItem('pl_season_filter');
     await sb.auth.signOut();
-    CU=null; dtCache=null; eventCache=[]; allEventsById={}; currentEventId='';
+    CU=null; dtCache=null; eventCache=[]; allEventsById={}; seasonCache=[]; currentEventId=''; currentSeasonId='';
+    if (typeof replaceAppRoute==='function') replaceAppRoute('/');
     document.getElementById('app').style.display='none';
     document.getElementById('auth-screen').style.display='flex';
     document.getElementById('li-user').value='';

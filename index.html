@@ -6,7 +6,7 @@
     <title>🍺 Pilseligaen</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-    <link rel="stylesheet" href="assets/css/styles.css?v=20260520-location-city">
+    <link rel="stylesheet" href="assets/css/styles.css?v=20260528-scope-toggle">
 </head>
 <body>
 
@@ -45,7 +45,7 @@
 <!-- APP -->
 <div id="app">
     <div class="topbar">
-        <div class="brand">🍺 Pilseligaen</div>
+        <button class="brand brand-link" type="button" data-route="/">🍺 Pilseligaen</button>
         <div class="topbar-r">
             <div class="avatar" id="usr-av">?</div>
             <span class="uname" id="usr-nm"></span>
@@ -54,7 +54,8 @@
             <select class="scope-select" id="event-filter" onchange="setEventFilter(this.value)" title="Velg totalvisning eller tur">
                 <option value="">Totalt</option>
             </select>
-            <button class="icon-btn" onclick="showView('events')">Turer</button>
+            <button class="icon-btn" type="button" data-route="/events" data-view="events">Turer</button>
+            <button class="icon-btn" type="button" data-route="/admin" data-view="admin" data-admin-only style="display:none">Admin</button>
             <button class="unit-toggle" id="unit-toggle" onclick="toggleAlcoholMode()" aria-label="Bytt mellom gram alkohol og alkoholenheter" title="Bytt mellom gram alkohol og alkoholenheter">
                 <span class="unit-choice active">Gram</span><span class="unit-swap">↔</span><span class="unit-choice">Enheter</span>
             </button>
@@ -64,6 +65,15 @@
 
     <!-- DASHBOARD -->
     <div class="view active" id="view-dashboard">
+        <div class="dashboard-scope-bar">
+            <button class="dashboard-scope-toggle" id="dashboard-scope-toggle" type="button" onclick="toggleDashboardSeasonScope()" aria-pressed="false" title="Bytt til Sommer 2026">
+                <span class="dashboard-scope-track" aria-hidden="true"><span class="dashboard-scope-thumb"></span></span>
+                <span class="dashboard-scope-copy">
+                    <span class="dashboard-scope-state" id="dashboard-scope-state">Totalt</span>
+                    <span class="dashboard-scope-next" id="dashboard-scope-next">Bytt til Sommer 2026</span>
+                </span>
+            </button>
+        </div>
         <div class="card" id="dash-stats"></div>
         <div class="card">
             <div class="sh"><div class="st">Feed</div><span class="live-badge"><span class="live-dot"></span>Live</span></div>
@@ -274,13 +284,27 @@
         </div>
     </div>
 
+    <!-- ADMIN -->
+    <div class="view" id="view-admin">
+        <div class="sh" style="margin-bottom:16px">
+            <h2 style="margin:0">Admin moderering</h2>
+            <span class="badge">Admin</span>
+        </div>
+        <div id="admin-panel"><div class="vload"><div class="spinner"></div>Laster…</div></div>
+    </div>
+
+    <!-- 404 -->
+    <div class="view" id="view-not-found">
+        <div id="not-found-detail"></div>
+    </div>
+
     <nav class="bottom-nav">
-        <button class="nav-item active" onclick="showView('dashboard',this)"><span class="nav-icon">🏠</span><span>Hjem</span></button>
-        <button class="nav-item" onclick="showView('log',this)"><span class="nav-icon">➕</span><span>Registrer</span></button>
-        <button class="nav-item" onclick="showView('stats',this)"><span class="nav-icon">📊</span><span>Statistikk</span></button>
-        <button class="nav-item" onclick="showView('lb',this)"><span class="nav-icon">🏆</span><span>Topp</span></button>
-        <button class="nav-item" onclick="showView('achievements',this)"><span class="nav-icon">🏅</span><span>Merker</span></button>
-        <button class="nav-item" onclick="showView('drinks',this)"><span class="nav-icon">🍺</span><span>Kort</span></button>
+        <button class="nav-item active" type="button" data-route="/" data-view="dashboard"><span class="nav-icon">🏠</span><span>Hjem</span></button>
+        <button class="nav-item" type="button" data-route="/log" data-view="log"><span class="nav-icon">➕</span><span>Registrer</span></button>
+        <button class="nav-item" type="button" data-route="/stats" data-view="stats"><span class="nav-icon">📊</span><span>Statistikk</span></button>
+        <button class="nav-item" type="button" data-route="/leaderboard" data-view="lb"><span class="nav-icon">🏆</span><span>Topp</span></button>
+        <button class="nav-item" type="button" data-route="/achievements" data-view="achievements"><span class="nav-icon">🏅</span><span>Merker</span></button>
+        <button class="nav-item" type="button" data-route="/drinks" data-view="drinks"><span class="nav-icon">🍺</span><span>Kort</span></button>
     </nav>
 </div>
 
@@ -288,8 +312,11 @@
 <script src="assets/js/supabase-client.js?v=20260520-events-h2h2"></script>
 <script src="assets/js/boot.js?v=20260520-events-h2h2"></script>
 <script src="assets/js/auth.js?v=20260520-events-h2h2"></script>
+<script src="assets/js/seasons.js?v=20260528-sommer-2026"></script>
+<script src="assets/js/pages.js?v=20260528-pages-admin"></script>
 <script src="assets/js/app.js?v=20260520-events-h2h2"></script>
-<script src="assets/js/events.js?v=20260520-trips-achievements"></script>
+<script src="assets/js/events.js?v=20260528-scope-toggle"></script>
+<script src="assets/js/admin.js?v=20260528-pages-admin"></script>
 <script src="assets/js/drink-types.js?v=20260520-events-h2h2"></script>
 <script src="assets/js/drink-log.js?v=20260520-location-city"></script>
 <script src="assets/js/dashboard.js?v=20260520-trips-achievements"></script>

@@ -85,10 +85,10 @@ async function renderDashboard() {
     const now = new Date();
 
     let currentDrinks, lastDrinks, sublabel;
-    if (currentEventId) {
+    if (currentEventId || currentSeasonId) {
         currentDrinks = visibleDrinksForScope(allDrinks||[]);
         lastDrinks = [];
-        sublabel = eventLabel();
+        sublabel = scopeLabel();
     } else {
         const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
         const lastMonthStart = new Date(now.getFullYear(), now.getMonth()-1, 1);
@@ -105,11 +105,12 @@ async function renderDashboard() {
     const myNow    = sumUser(currentDrinks, CU.id);
     const groupNow = sumUser(currentDrinks, null);
     const monthFloor = 12 * ALCOHOL_UNIT_GRAMS;
-    const myLast   = currentEventId ? 100 : Math.max(sumUser(lastDrinks, CU.id), monthFloor);
-    const groupLast= currentEventId ? Math.max(100, scopeUsers.length*100) : Math.max(sumUser(lastDrinks, null), scopeUsers.length * monthFloor);
+    const scopedPeriod = currentEventId || currentSeasonId;
+    const myLast   = scopedPeriod ? 100 : Math.max(sumUser(lastDrinks, CU.id), monthFloor);
+    const groupLast= scopedPeriod ? Math.max(100, scopeUsers.length*100) : Math.max(sumUser(lastDrinks, null), scopeUsers.length * monthFloor);
 
-    const myLastDisplay    = currentEventId ? 0 : sumUser(lastDrinks, CU.id);
-    const groupLastDisplay = currentEventId ? 0 : sumUser(lastDrinks, null);
+    const myLastDisplay    = scopedPeriod ? 0 : sumUser(lastDrinks, CU.id);
+    const groupLastDisplay = scopedPeriod ? 0 : sumUser(lastDrinks, null);
 
     document.getElementById('dash-stats').innerHTML = `<div class="beer-glass-pair">
         ${renderBeerGlassHtml(myNow,    myLast,    displayName(myProfile), sublabel, myLastDisplay)}
@@ -232,7 +233,10 @@ async function renderDrinkFeed() {
         : [];
     const achEvents=currentEventId
         ? allAchievementEvents.filter(e=>e.event_id===currentEventId || e.achievement?.id==='first_comment')
-        : allAchievementEvents;    const sortedFeed=[...drinkEvents,...achEvents].sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+        : currentSeasonId
+            ? allAchievementEvents.filter(e=>currentSeasonContains(e.ts || e.drink_ts))
+            : allAchievementEvents;
+    const sortedFeed=[...drinkEvents,...achEvents].sort((a,b)=>new Date(b.ts)-new Date(a.ts));
     const feed=sortedFeed.slice(0,feedLimit);    const hasMore=sortedFeed.length>feed.length;
     if (!feed.length){el.innerHTML='<div class="empty">Ingen aktivitet ennå.</div>';return;}
     const drinkIds=feed.filter(e=>e.kind==='drink').map(e=>e.drink.id);

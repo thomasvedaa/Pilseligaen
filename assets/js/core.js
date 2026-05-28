@@ -24,6 +24,7 @@ if (window.Chart) {
 const ALCOHOL_UNIT_GRAMS = 12;
 const AUTH_EMAIL_DOMAIN = 'pilseligaen.local';
 const PROFILE_SELECT = 'id,username,nickname,avatar_url,color,created_at';
+const PROFILE_SELECT_WITH_ADMIN = PROFILE_SELECT + ',is_admin';
 let alcoholMode = localStorage.getItem('pl_alcohol_mode') || 'grams';
 
 const DEFAULT_DTYPES = [
@@ -54,6 +55,9 @@ function esc(value) {
 }
 function displayName(user) {
     return (user?.nickname || user?.username || '?').trim() || '?';
+}
+function isAdmin(user) {
+    return user?.is_admin === true;
 }
 function userInitial(user) {
     return displayName(user)[0].toUpperCase();
@@ -147,9 +151,15 @@ function eventLabel(id=currentEventId) {
     const event=eventById(id);
     return event ? event.name : 'Totalt';
 }
+function scopeLabel() {
+    if (currentSeasonId) return seasonLabel(currentSeasonId);
+    if (currentEventId) return eventLabel(currentEventId);
+    return 'Totalt';
+}
 function visibleDrinksForScope(drinks) {
     const rows=drinks||[];
     if (!eventSchemaReady) return rows;
+    if (currentSeasonId) return rows.filter(d=>currentSeasonContains(d.ts));
     if (currentEventId) return rows.filter(d=>d.event_id===currentEventId);
     return rows;
 }
