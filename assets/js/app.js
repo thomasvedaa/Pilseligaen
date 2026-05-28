@@ -15,7 +15,23 @@ function staticRouteMap() {
         .map(page => [page.path, page]));
 }
 
+function appBasePathFromScript() {
+    const script = document.currentScript || document.querySelector('script[src*="assets/js/app.js"]');
+    if (!script?.src) return '';
+
+    try {
+        const scriptUrl = new URL(script.src, window.location.href);
+        const base = scriptUrl.pathname.replace(/\/assets\/js\/app\.js$/, '');
+        if (base !== scriptUrl.pathname) return base.replace(/\/$/, '');
+    } catch (_) {}
+
+    return '';
+}
+
 function detectAppBasePath() {
+    const assetBase = appBasePathFromScript();
+    if (assetBase) return assetBase;
+
     const path = window.location.pathname || '/';
     if (path.endsWith('/index.html')) {
         return path.slice(0, -'/index.html'.length) || '';
