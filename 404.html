@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <title>Pilseligaen</title>
+    <script>
+        (() => {
+            const routeSegments = new Set(['log','stats','leaderboard','lb','drinks','drink-types','achievements','events','admin','404']);
+            const path = window.location.pathname || '/';
+            const parts = path.replace(/\/+$/, '').split('/').filter(Boolean);
+            const routeIndex = parts.findIndex(part => routeSegments.has(part));
+
+            if (routeIndex < 0) {
+                window.location.replace('/');
+                return;
+            }
+
+            const baseParts = parts.slice(0, routeIndex);
+            const route = `/${parts.slice(routeIndex).join('/')}`;
+            const base = baseParts.length ? `/${baseParts.join('/')}/` : '/';
+            const search = window.location.search || '';
+
+            window.location.replace(`${base}#${route}${search}`);
+        })();
+    </script>
+</head>
+<body>
+    Laster Pilseligaen...
+</body>
+</html>

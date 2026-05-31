@@ -11,8 +11,8 @@ const ACHIEVEMENTS = [
     {id:'units100', icon:'🥈', name:'Godt i gang', desc:'100 alkoholenheter totalt.', check:s=>s.totalUnits>=100, progress:s=>`${fmtAchievementUnits(Math.min(s.totalUnits,100))}/100 enheter`},
     {id:'units1000', icon:'🥇', name:'Veteran', desc:'1000 alkoholenheter totalt.', check:s=>s.totalUnits>=1000, progress:s=>`${fmtAchievementUnits(Math.min(s.totalUnits,1000))}/1000 enheter`},
     {id:'units5000', icon:'💀', name:'Legenden', desc:'5000 alkoholenheter totalt.', check:s=>s.totalUnits>=5000, progress:s=>`${fmtAchievementUnits(Math.min(s.totalUnits,5000))}/5000 enheter`},
-    {id:'streak10', icon:'🔥', name:'3 dager streak', desc:'Drakk 3 dager på rad.', check:s=>s.bestStreak>=10, progress:s=>`${Math.min(s.bestStreak,10)}/3 dager`},
-    {id:'streak100', icon:'🔥', name:'10 dager streak', desc:'Drakk 10 dager på rad.', check:s=>s.bestStreak>=100, progress:s=>`${Math.min(s.bestStreak,100)}/10 dager`},
+    {id:'streak10', icon:'🔥', name:'3 dager streak', desc:'Drakk 3 dager på rad.', check:s=>s.bestStreak>=3, progress:s=>`${Math.min(s.bestStreak,3)}/3 dager`},
+    {id:'streak100', icon:'🔥', name:'10 dager streak', desc:'Drakk 10 dager på rad.', check:s=>s.bestStreak>=10, progress:s=>`${Math.min(s.bestStreak,10)}/10 dager`},
     {id:'twelve_half', icon:'🍺', name:'Yummers', desc:'Minst 12 halvlitere øl i samme kveld.', check:s=>s.maxEveningHalfLiters>=12, progress:s=>`${fmtNo(Math.min(s.maxEveningHalfLiters,12),1)}/12`},
     {id:'chilli_klaus', icon:'🌶️', name:'Chili Klaus', desc:'Tatt deg en shot med guds gave', check:s=>s.hasChilli, progress:s=>s.hasChilli?'Klar':'0/1'},
     {id:'morningbird', icon:'🌅', name:'Six seven', desc:'Registrerte en drink mellom 06 og 07.', check:s=>s.hasMorning, progress:s=>s.hasMorning?'Klar':'0/1'},
@@ -284,8 +284,8 @@ function achievementUnlockEvents(user,drinks,comments=[]) {
             lastDay=k;
             (monthDays[m] ||= new Set()).add(k);
 
-            if (dayRun>=10) unlock('streak10',d);
-            if (dayRun>=100) unlock('streak100',d);
+            if (dayRun>=3) unlock('streak10',d);
+            if (dayRun>=10) unlock('streak100',d);
             if (days.size>=30) unlock('regular',d);
             if (monthDays[m].size>=10) unlock('month10',d);
         }

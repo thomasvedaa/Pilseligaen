@@ -4,6 +4,31 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🍺 Pilseligaen</title>
+    <script>
+        (() => {
+            const routeSegments = new Set(['log','stats','leaderboard','lb','drinks','drink-types','achievements','events','admin','404']);
+            const path = window.location.pathname || '/';
+            const trimmed = path.replace(/\/+$/, '');
+            const parts = trimmed.split('/').filter(Boolean);
+            const routeIndex = parts.findIndex(part => routeSegments.has(part));
+            let base = '/';
+
+            if (path.endsWith('/index.html')) {
+                base = path.slice(0, -'index.html'.length) || '/';
+            } else if (routeIndex >= 0) {
+                const baseParts = parts.slice(0, routeIndex);
+                base = baseParts.length ? `/${baseParts.join('/')}/` : '/';
+            } else if (path.endsWith('/')) {
+                base = path;
+            } else if (parts.length > 1) {
+                base = `/${parts.slice(0, -1).join('/')}/`;
+            }
+
+            const tag = document.createElement('base');
+            tag.href = base;
+            document.head.appendChild(tag);
+        })();
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
     <link rel="stylesheet" href="assets/css/styles.css?v=20260528-scope-toggle">
@@ -322,7 +347,7 @@
 <script src="assets/js/dashboard.js?v=20260520-trips-achievements"></script>
 <script src="assets/js/stats.js?v=20260520-events-h2h2"></script>
 <script src="assets/js/leaderboard.js?v=20260520-events-h2h2"></script>
-<script src="assets/js/achievements.js?v=20260520-trips-achievements"></script>
+<script src="assets/js/achievements.js?v=20260531-streak-fix"></script>
 <script src="assets/js/confetti.js?v=20260520-confettifix"></script>
 </body>
 </html>
