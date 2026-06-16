@@ -88,6 +88,26 @@
                         <button class="menu-item" type="button" data-route="/groups" data-view="groups">Grupper</button>
                         <button class="menu-item" type="button" data-route="/admin" data-view="admin" data-admin-only style="display:none">Admin</button>
                     </div>
+                    <div class="menu-section menu-groups">
+                        <div class="menu-heading">Grupper</div>
+                        <div class="menu-form">
+                            <label>Bli med</label>
+                            <div class="menu-inline">
+                                <input type="text" id="group-join-code" placeholder="Kode" maxlength="24">
+                                <button class="btn btn-p btn-sm" type="button" onclick="joinGroupByCode()">Bli med</button>
+                            </div>
+                        </div>
+                        <div class="menu-form">
+                            <label>Lag gruppe</label>
+                            <input type="text" id="group-name" placeholder="Navn" maxlength="48">
+                            <div class="menu-inline">
+                                <input type="text" id="group-code" placeholder="Tom = tilfeldig" maxlength="24">
+                                <button class="btn btn-p btn-sm" type="button" onclick="createGroup()">Opprett</button>
+                            </div>
+                        </div>
+                        <div class="menu-heading subtle">Mine grupper</div>
+                        <div id="group-menu-list" class="menu-group-list"></div>
+                    </div>
                     <div class="menu-section">
                         <button class="menu-item" type="button" onclick="closeTopbarMenu();editNickname()">Navn</button>
                         <button class="menu-item" type="button" onclick="closeTopbarMenu();editAvatar()">Bilde</button>

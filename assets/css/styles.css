@@ -286,7 +286,9 @@ select option { background:var(--card2); color:var(--text); }
     position:absolute;
     top:calc(100% + 8px);
     right:0;
-    width:min(292px, calc(100vw - 24px));
+    width:min(380px, calc(100vw - 24px));
+    max-height:min(72vh, 620px);
+    overflow-y:auto;
     display:none;
     flex-direction:column;
     gap:8px;
@@ -302,6 +304,15 @@ select option { background:var(--card2); color:var(--text); }
 .topbar-menu-panel.open { display:flex; }
 .menu-section { display:flex; flex-direction:column; gap:6px; }
 .menu-section + .menu-section { border-top:1px solid var(--border); padding-top:8px; }
+.menu-heading {
+    color:var(--accent-hi);
+    font-size:.78em;
+    font-weight:800;
+    letter-spacing:.4px;
+    text-transform:uppercase;
+    padding:2px 2px 0;
+}
+.menu-heading.subtle { color:var(--dim); margin-top:2px; }
 .menu-item {
     width:100%;
     border:1px solid transparent;
@@ -325,6 +336,90 @@ select option { background:var(--card2); color:var(--text); }
 .menu-item.danger { color:color-mix(in oklab, var(--red) 84%, white); }
 .menu-scope { width:100%; max-width:none; font-size:.88em; margin-bottom:2px; }
 .menu-unit-toggle { width:100%; justify-content:center; }
+.menu-form {
+    border:1px solid var(--border);
+    border-radius:10px;
+    background:var(--card2);
+    padding:9px;
+}
+.menu-form label {
+    font-size:.66em;
+    margin-bottom:5px;
+}
+.menu-form input {
+    padding:8px 10px;
+    border-radius:8px;
+    font-size:.84em;
+}
+.menu-inline {
+    display:flex;
+    align-items:stretch;
+    gap:7px;
+}
+.menu-inline input { min-width:0; }
+.menu-inline .btn {
+    flex:0 0 auto;
+    min-width:82px;
+    padding:8px 10px;
+}
+.menu-group-list { display:flex; flex-direction:column; gap:6px; }
+.menu-empty {
+    color:var(--dim);
+    border:1px dashed var(--border);
+    border-radius:10px;
+    padding:10px;
+    font-size:.82em;
+    text-align:center;
+}
+.menu-group-row {
+    border:1px solid var(--border);
+    border-radius:10px;
+    background:var(--card2);
+    padding:9px;
+}
+.menu-group-row.active {
+    border-color:color-mix(in oklab, var(--accent) 38%, var(--border));
+    background:var(--accent-softer);
+}
+.menu-group-main {
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+    min-width:0;
+}
+.menu-group-main strong {
+    font-size:.88em;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+.menu-group-main small { color:var(--dim); font-size:.72em; }
+.menu-group-actions {
+    display:flex;
+    flex-wrap:wrap;
+    gap:5px;
+    margin-top:8px;
+}
+.mini-btn {
+    border:1px solid var(--border);
+    border-radius:8px;
+    background:color-mix(in oklab, var(--card3) 65%, transparent);
+    color:var(--text);
+    cursor:pointer;
+    font-family:inherit;
+    font-size:.72em;
+    font-weight:700;
+    padding:6px 8px;
+}
+.mini-btn:hover {
+    border-color:var(--accent);
+    color:var(--accent-hi);
+}
+.mini-btn.danger {
+    border-color:color-mix(in oklab, var(--red) 40%, var(--border));
+    color:#fff;
+    background:color-mix(in oklab, var(--red) 62%, var(--card2));
+}
 
 @media (max-width: 560px) {
     .topbar { padding: 9px 12px 10px; }

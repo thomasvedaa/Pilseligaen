@@ -41,6 +41,7 @@ function updateGroupControls() {
     const label=document.getElementById('group-active-label');
     if (label) label.textContent=currentGroupId ? groupById(currentGroupId)?.name || 'Gruppe' : 'Ingen gruppe';
     renderGroupFilter();
+    renderGroupMenuList();
 }
 
 function renderGroupFilter() {
@@ -63,6 +64,37 @@ function renderGroupFilter() {
         .map(g=>`<option value="${g.id}">${esc(g.name)}</option>`)
         .join('');
     select.value=currentGroupId || groupCache[0].id;
+}
+
+function renderGroupMenuList() {
+    const el=document.getElementById('group-menu-list');
+    if (!el) return;
+
+    if (!groupSchemaReady) {
+        el.innerHTML='<div class="menu-empty">Kjør schema.sql først.</div>';
+        return;
+    }
+    if (!groupCache.length) {
+        el.innerHTML='<div class="menu-empty">Ingen grupper ennå.</div>';
+        return;
+    }
+
+    el.innerHTML=(groupCache||[]).map(g=>{
+        const active=g.id===currentGroupId;
+        const canDelete=g.created_by===CU.id || isAdmin(CU);
+        return `<div class="menu-group-row${active?' active':''}">
+            <div class="menu-group-main">
+                <strong>${esc(g.name)}</strong>
+                <small>Kode ${esc(g.code)} · ${g.member_count||1} ${g.member_count===1?'person':'personer'}</small>
+            </div>
+            <div class="menu-group-actions">
+                <button class="mini-btn" type="button" onclick="copyGroupCode('${esc(g.code)}')">Kopier</button>
+                <button class="mini-btn" type="button" onclick="activateGroup('${g.id}')">${active?'Valgt':'Velg'}</button>
+                <button class="mini-btn" type="button" onclick="leaveGroup('${g.id}')">Forlat</button>
+                ${canDelete?`<button class="mini-btn danger" type="button" onclick="deleteGroup('${g.id}')">Slett</button>`:''}
+            </div>
+        </div>`;
+    }).join('');
 }
 
 async function loadGroups() {
