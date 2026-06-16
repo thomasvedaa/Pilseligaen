@@ -1328,6 +1328,43 @@ h2 {
 .group-ranked { margin-top:10px; }
 .group-filter-card { padding:14px 16px; }
 .group-filter-field { margin-bottom:0; }
+.group-tools-card { padding:10px; }
+.group-tools-toggle {
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    border:1px solid var(--border);
+    border-radius:10px;
+    background:var(--card2);
+    color:var(--text);
+    cursor:pointer;
+    font-family:inherit;
+    font-weight:800;
+    padding:11px 13px;
+    text-align:left;
+}
+.group-tools-toggle:hover,
+.group-tools-toggle[aria-expanded="true"] {
+    border-color:var(--accent);
+    background:var(--accent-softer);
+}
+.group-tools-toggle strong {
+    color:var(--accent-hi);
+    font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    letter-spacing:1px;
+    line-height:1;
+    padding-bottom:4px;
+}
+.group-tools-panel {
+    display:none;
+    flex-direction:column;
+    gap:9px;
+    margin-top:10px;
+}
+.group-tools-panel.open { display:flex; }
+.group-tool-form input + .menu-inline { margin-top:7px; }
 @media (max-width: 520px) {
     .scope-select:not(.menu-scope) { max-width:130px; }
     .event-row, .event-card, .group-row, .group-card { flex-direction:column; align-items:stretch; }

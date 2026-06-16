@@ -32,7 +32,7 @@
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-    <link rel="stylesheet" href="assets/css/styles.css?v=20260616-menu-groups">
+    <link rel="stylesheet" href="assets/css/styles.css?v=20260616-group-tools">
 </head>
 <body>
 
@@ -87,26 +87,6 @@
                         <button class="menu-item" type="button" data-route="/events" data-view="events">Turer</button>
                         <button class="menu-item" type="button" data-route="/groups" data-view="groups">Grupper</button>
                         <button class="menu-item" type="button" data-route="/admin" data-view="admin" data-admin-only style="display:none">Admin</button>
-                    </div>
-                    <div class="menu-section menu-groups">
-                        <div class="menu-heading">Grupper</div>
-                        <div class="menu-form">
-                            <label>Bli med</label>
-                            <div class="menu-inline">
-                                <input type="text" id="group-join-code" placeholder="Kode" maxlength="24">
-                                <button class="btn btn-p btn-sm" type="button" onclick="joinGroupByCode()">Bli med</button>
-                            </div>
-                        </div>
-                        <div class="menu-form">
-                            <label>Lag gruppe</label>
-                            <input type="text" id="group-name" placeholder="Navn" maxlength="48">
-                            <div class="menu-inline">
-                                <input type="text" id="group-code" placeholder="Tom = tilfeldig" maxlength="24">
-                                <button class="btn btn-p btn-sm" type="button" onclick="createGroup()">Opprett</button>
-                            </div>
-                        </div>
-                        <div class="menu-heading subtle">Mine grupper</div>
-                        <div id="group-menu-list" class="menu-group-list"></div>
                     </div>
                     <div class="menu-section">
                         <button class="menu-item" type="button" onclick="closeTopbarMenu();editNickname()">Navn</button>
@@ -348,6 +328,31 @@
             <h2 style="margin:0">Grupper</h2>
             <span class="badge" id="group-active-label">Ingen gruppe</span>
         </div>
+        <div class="card">
+            <div class="st" style="margin-bottom:12px">Bli med med kode</div>
+            <div class="row group-row">
+                <div class="fg"><label>Kode</label><input type="text" id="group-page-join-code" placeholder="F.eks. KOLLEKTIVET" maxlength="24"></div>
+                <button class="btn btn-p group-action" onclick="joinGroupByCode('group-page-join-code')">Bli med</button>
+            </div>
+        </div>
+        <div class="card group-tools-card">
+            <button class="group-tools-toggle" id="group-tools-toggle" type="button" onclick="toggleGroupTools()" aria-expanded="false" aria-controls="group-tools-panel">
+                <span>Administrer grupper</span>
+                <strong>...</strong>
+            </button>
+            <div class="group-tools-panel" id="group-tools-panel">
+                <div class="menu-form group-tool-form">
+                    <label>Lag gruppe</label>
+                    <input type="text" id="group-name" placeholder="Navn" maxlength="48">
+                    <div class="menu-inline">
+                        <input type="text" id="group-code" placeholder="Tom = tilfeldig" maxlength="24">
+                        <button class="btn btn-p btn-sm" type="button" onclick="createGroup()">Opprett</button>
+                    </div>
+                </div>
+                <div class="menu-heading subtle">Mine grupper</div>
+                <div id="group-tools-list" class="menu-group-list"></div>
+            </div>
+        </div>
         <div class="card group-filter-card">
             <div class="fg group-filter-field">
                 <label>Gruppe</label>
@@ -396,9 +401,9 @@
 <script src="assets/js/auth.js?v=20260616-groups"></script>
 <script src="assets/js/seasons.js?v=20260528-sommer-2026"></script>
 <script src="assets/js/pages.js?v=20260616-groups"></script>
-<script src="assets/js/app.js?v=20260616-menu-groups"></script>
+<script src="assets/js/app.js?v=20260616-group-tools"></script>
 <script src="assets/js/events.js?v=20260528-scope-toggle"></script>
-<script src="assets/js/groups.js?v=20260616-menu-groups"></script>
+<script src="assets/js/groups.js?v=20260616-group-tools"></script>
 <script src="assets/js/admin.js?v=20260528-pages-admin"></script>
 <script src="assets/js/drink-types.js?v=20260520-events-h2h2"></script>
 <script src="assets/js/drink-log.js?v=20260520-location-city"></script>

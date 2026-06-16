@@ -66,8 +66,17 @@ function renderGroupFilter() {
     select.value=currentGroupId || groupCache[0].id;
 }
 
+function toggleGroupTools(force) {
+    const panel=document.getElementById('group-tools-panel');
+    const btn=document.getElementById('group-tools-toggle');
+    if (!panel || !btn) return;
+    const open=typeof force==='boolean' ? force : !panel.classList.contains('open');
+    panel.classList.toggle('open',open);
+    btn.setAttribute('aria-expanded',open?'true':'false');
+}
+
 function renderGroupMenuList() {
-    const el=document.getElementById('group-menu-list');
+    const el=document.getElementById('group-tools-list');
     if (!el) return;
 
     if (!groupSchemaReady) {
@@ -208,9 +217,10 @@ async function createGroup() {
     showToast(`Gruppe opprettet. Kode: ${code}`);
 }
 
-async function joinGroupByCode() {
+async function joinGroupByCode(inputId='group-join-code') {
     if (!(await ensureGroupsReady())) return;
-    const code=cleanGroupCode(document.getElementById('group-join-code').value);
+    const input=document.getElementById(inputId);
+    const code=cleanGroupCode(input?.value);
     if (code.length<3) {showToast('Skriv inn en gyldig kode.',false);return;}
 
     setLoading(true,'Sjekker kode...');
@@ -221,7 +231,7 @@ async function joinGroupByCode() {
         return;
     }
 
-    document.getElementById('group-join-code').value='';
+    if (input) input.value='';
     await afterGroupJoined(group);
     showToast(`Du er med i ${group.name}.`);
 }
