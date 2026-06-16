@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🍺 Pilseligaen</title>
+    <title>Pilseligaen</title>
     <script>
         (() => {
-            const routeSegments = new Set(['log','stats','leaderboard','lb','drinks','drink-types','achievements','events','admin','404']);
+            const routeSegments = new Set(['log','stats','leaderboard','lb','drinks','drink-types','achievements','events','groups','admin','404']);
             const path = window.location.pathname || '/';
             const trimmed = path.replace(/\/+$/, '');
             const parts = trimmed.split('/').filter(Boolean);
@@ -29,9 +29,10 @@
             document.head.appendChild(tag);
         })();
     </script>
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-    <link rel="stylesheet" href="assets/css/styles.css?v=20260528-scope-toggle">
+    <link rel="stylesheet" href="assets/css/styles.css?v=20260616-menu-groups">
 </head>
 <body>
 
@@ -72,19 +73,31 @@
     <div class="topbar">
         <button class="brand brand-link" type="button" data-route="/">🍺 Pilseligaen</button>
         <div class="topbar-r">
-            <div class="avatar" id="usr-av">?</div>
-            <span class="uname" id="usr-nm"></span>
-            <button class="icon-btn" onclick="editNickname()">Navn</button>
-            <button class="icon-btn" onclick="editAvatar()">Bilde</button>
-            <select class="scope-select" id="event-filter" onchange="setEventFilter(this.value)" title="Velg totalvisning eller tur">
-                <option value="">Totalt</option>
-            </select>
-            <button class="icon-btn" type="button" data-route="/events" data-view="events">Turer</button>
-            <button class="icon-btn" type="button" data-route="/admin" data-view="admin" data-admin-only style="display:none">Admin</button>
-            <button class="unit-toggle" id="unit-toggle" onclick="toggleAlcoholMode()" aria-label="Bytt mellom gram alkohol og alkoholenheter" title="Bytt mellom gram alkohol og alkoholenheter">
-                <span class="unit-choice active">Gram</span><span class="unit-swap">↔</span><span class="unit-choice">Enheter</span>
-            </button>
-            <button class="icon-btn" onclick="handleLogout()">Logg ut</button>
+            <div class="topbar-user">
+                <div class="avatar" id="usr-av">?</div>
+                <span class="uname" id="usr-nm"></span>
+            </div>
+            <div class="topbar-menu">
+                <button class="menu-dot-btn" id="topbar-menu-toggle" type="button" onclick="toggleTopbarMenu()" aria-haspopup="true" aria-expanded="false" aria-controls="topbar-menu-panel" title="Meny">...</button>
+                <div class="topbar-menu-panel" id="topbar-menu-panel">
+                    <div class="menu-section">
+                        <select class="scope-select menu-scope" id="event-filter" onchange="setEventFilter(this.value)" title="Velg totalvisning eller tur">
+                            <option value="">Totalt</option>
+                        </select>
+                        <button class="menu-item" type="button" data-route="/events" data-view="events">Turer</button>
+                        <button class="menu-item" type="button" data-route="/groups" data-view="groups">Grupper</button>
+                        <button class="menu-item" type="button" data-route="/admin" data-view="admin" data-admin-only style="display:none">Admin</button>
+                    </div>
+                    <div class="menu-section">
+                        <button class="menu-item" type="button" onclick="closeTopbarMenu();editNickname()">Navn</button>
+                        <button class="menu-item" type="button" onclick="closeTopbarMenu();editAvatar()">Bilde</button>
+                        <button class="unit-toggle menu-unit-toggle" id="unit-toggle" onclick="toggleAlcoholMode()" aria-label="Bytt mellom gram alkohol og alkoholenheter" title="Bytt mellom gram alkohol og alkoholenheter">
+                            <span class="unit-choice active">Gram</span><span class="unit-swap">↔</span><span class="unit-choice">Enheter</span>
+                        </button>
+                        <button class="menu-item danger" type="button" onclick="closeTopbarMenu();handleLogout()">Logg ut</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -309,6 +322,29 @@
         </div>
     </div>
 
+    <!-- GROUPS -->
+    <div class="view" id="view-groups">
+        <div class="sh" style="margin-bottom:16px">
+            <h2 style="margin:0">Grupper</h2>
+            <span class="badge" id="group-active-label">Ingen gruppe</span>
+        </div>
+        <div class="card group-filter-card">
+            <div class="fg group-filter-field">
+                <label>Gruppe</label>
+                <select id="group-filter" onchange="activateGroup(this.value)">
+                    <option value="">Laster...</option>
+                </select>
+            </div>
+        </div>
+        <div class="card" id="group-board-card" style="display:none">
+            <div class="sh">
+                <div class="st" id="group-board-title">Gruppetopp</div>
+                <span class="badge" id="group-board-meta"></span>
+            </div>
+            <div id="group-board"><div class="vload"><div class="spinner"></div>Laster...</div></div>
+        </div>
+    </div>
+
     <!-- ADMIN -->
     <div class="view" id="view-admin">
         <div class="sh" style="margin-bottom:16px">
@@ -329,6 +365,7 @@
         <button class="nav-item" type="button" data-route="/stats" data-view="stats"><span class="nav-icon">📊</span><span>Statistikk</span></button>
         <button class="nav-item" type="button" data-route="/leaderboard" data-view="lb"><span class="nav-icon">🏆</span><span>Topp</span></button>
         <button class="nav-item" type="button" data-route="/achievements" data-view="achievements"><span class="nav-icon">🏅</span><span>Merker</span></button>
+        <button class="nav-item" type="button" data-route="/groups" data-view="groups"><span class="nav-icon">👥</span><span>Grupper</span></button>
         <button class="nav-item" type="button" data-route="/drinks" data-view="drinks"><span class="nav-icon">🍺</span><span>Kort</span></button>
     </nav>
 </div>
@@ -336,11 +373,12 @@
 <script src="assets/js/core.js?v=20260520-trips-achievements"></script>
 <script src="assets/js/supabase-client.js?v=20260520-events-h2h2"></script>
 <script src="assets/js/boot.js?v=20260520-events-h2h2"></script>
-<script src="assets/js/auth.js?v=20260520-events-h2h2"></script>
+<script src="assets/js/auth.js?v=20260616-groups"></script>
 <script src="assets/js/seasons.js?v=20260528-sommer-2026"></script>
-<script src="assets/js/pages.js?v=20260528-pages-admin"></script>
-<script src="assets/js/app.js?v=20260528-pages-base"></script>
+<script src="assets/js/pages.js?v=20260616-groups"></script>
+<script src="assets/js/app.js?v=20260616-menu-groups"></script>
 <script src="assets/js/events.js?v=20260528-scope-toggle"></script>
+<script src="assets/js/groups.js?v=20260616-menu-groups"></script>
 <script src="assets/js/admin.js?v=20260528-pages-admin"></script>
 <script src="assets/js/drink-types.js?v=20260520-events-h2h2"></script>
 <script src="assets/js/drink-log.js?v=20260520-location-city"></script>

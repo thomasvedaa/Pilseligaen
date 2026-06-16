@@ -1,5 +1,5 @@
 /* PAGE MODULES */
-const PAGE_ROUTE_SEGMENTS = ['log','stats','leaderboard','lb','drinks','drink-types','achievements','events','admin','404'];
+const PAGE_ROUTE_SEGMENTS = ['log','stats','leaderboard','lb','drinks','drink-types','achievements','events','groups','admin','404'];
 
 const ROUTE_ALIASES = {
     '/lb': '/leaderboard',
@@ -78,6 +78,13 @@ const PAGE_MODULES = {
         nav: 'events',
         title: 'Turer - Pilseligaen',
         render: async () => renderEvents()
+    },
+    groups: {
+        view: 'groups',
+        path: '/groups',
+        nav: 'groups',
+        title: 'Grupper - Pilseligaen',
+        render: async () => renderGroups()
     },
     admin: {
         view: 'admin',

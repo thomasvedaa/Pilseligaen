@@ -2,6 +2,7 @@
    START APP
 ════════════════════════════════════════════ */
 let routerBound = false;
+let topbarMenuBound = false;
 let appBasePath = detectAppBasePath();
 let activeRouteState = {view:'dashboard',route:'/',params:{}};
 
@@ -143,6 +144,33 @@ async function navigateToRoute(routePath, options={}) {
     await activateView(state.view, options);
 }
 
+function closeTopbarMenu() {
+    const panel=document.getElementById('topbar-menu-panel');
+    const btn=document.getElementById('topbar-menu-toggle');
+    if (panel) panel.classList.remove('open');
+    if (btn) btn.setAttribute('aria-expanded','false');
+}
+
+function toggleTopbarMenu(force) {
+    const panel=document.getElementById('topbar-menu-panel');
+    const btn=document.getElementById('topbar-menu-toggle');
+    if (!panel || !btn) return;
+    const open=typeof force==='boolean' ? force : !panel.classList.contains('open');
+    panel.classList.toggle('open',open);
+    btn.setAttribute('aria-expanded',open?'true':'false');
+}
+
+function bindTopbarMenu() {
+    if (topbarMenuBound) return;
+    document.addEventListener('click',event=>{
+        if (!event.target.closest('.topbar-menu')) closeTopbarMenu();
+    });
+    document.addEventListener('keydown',event=>{
+        if (event.key==='Escape') closeTopbarMenu();
+    });
+    topbarMenuBound=true;
+}
+
 async function loadRouteFromLocation(options={}) {
     const state = routeStateForPath(routePathFromLocation());
     activeRouteState = state;
@@ -157,6 +185,7 @@ function bindAppRouter() {
         if (!trigger || trigger.disabled) return;
         if (trigger.tagName === 'A' && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)) return;
         event.preventDefault();
+        closeTopbarMenu();
         navigateToRoute(trigger.dataset.route);
     });
     window.addEventListener('popstate', () => loadRouteFromLocation({scroll:false}));
@@ -175,12 +204,16 @@ async function startApp(user) {
     updateUserHeader();
     document.getElementById('app').style.display='block';
     bindAppRouter();
+    bindTopbarMenu();
     updateAlcoholModeButton();
     await loadSeasons();
     await loadEvents();
+    await loadGroups();
     ensureSeasonRealtime();
     ensureEventRealtime();
+    ensureGroupRealtime();
     updateEventControls();
+    updateGroupControls();
     resetDt();
     await loadRouteFromLocation({replace:true});
 }
@@ -278,6 +311,7 @@ async function refreshActiveViewForAlcoholMode() {
     if (view==='lb') await fetchAndRenderLb(lbFilter);
     if (view==='achievements') await renderAchievements();
     if (view==='profile') await renderAchievementProfile(achProfileUserId);
+    if (view==='groups') await renderGroups();
     if (view==='drinks') await renderDtList();
     if (view==='events') await renderEvents();
     if (view==='log') {

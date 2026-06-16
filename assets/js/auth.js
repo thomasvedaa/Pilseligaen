@@ -48,6 +48,7 @@ function cleanupRealtime() {
     if (feedChannel){sb.removeChannel(feedChannel);feedChannel=null;}
     if (typeof achChannel!=='undefined' && achChannel){sb.removeChannel(achChannel);achChannel=null;}
     if (eventChannel){sb.removeChannel(eventChannel);eventChannel=null;}
+    if (typeof groupChannel!=='undefined' && groupChannel){sb.removeChannel(groupChannel);groupChannel=null;}
     if (seasonChannel){sb.removeChannel(seasonChannel);seasonChannel=null;}
 }
 
@@ -135,8 +136,10 @@ async function handleLogout() {
     localStorage.removeItem('pl_uid');
     localStorage.removeItem('pl_event_filter');
     localStorage.removeItem('pl_season_filter');
+    localStorage.removeItem('pl_group_filter');
     await sb.auth.signOut();
     CU=null; dtCache=null; eventCache=[]; allEventsById={}; seasonCache=[]; currentEventId=''; currentSeasonId='';
+    if (typeof groupCache!=='undefined') { groupCache=[]; allGroupsById={}; currentGroupId=''; }
     if (typeof replaceAppRoute==='function') replaceAppRoute('/');
     document.getElementById('app').style.display='none';
     document.getElementById('auth-screen').style.display='flex';

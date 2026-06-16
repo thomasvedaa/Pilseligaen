@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(fileURLToPath(new URL('../', import.meta.url)));
 const port = Number(process.env.PORT || 5173);
 const host = process.env.HOST || '127.0.0.1';
-const appRoutes = new Set(['','log','stats','leaderboard','lb','drinks','drink-types','achievements','events','admin','404']);
+const appRoutes = new Set(['','log','stats','leaderboard','lb','drinks','drink-types','achievements','events','groups','admin','404']);
 
 const types = {
     '.html': 'text/html; charset=utf-8',

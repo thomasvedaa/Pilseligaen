@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <title>Pilseligaen</title>
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <script>
         (() => {
-            const routeSegments = new Set(['log','stats','leaderboard','lb','drinks','drink-types','achievements','events','admin','404']);
+            const routeSegments = new Set(['log','stats','leaderboard','lb','drinks','drink-types','achievements','events','groups','admin','404']);
             const path = window.location.pathname || '/';
             const parts = path.replace(/\/+$/, '').split('/').filter(Boolean);
             const routeIndex = parts.findIndex(part => routeSegments.has(part));

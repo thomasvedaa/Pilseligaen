@@ -61,6 +61,16 @@ CREATE TABLE IF NOT EXISTS public.pl_events (
 ALTER TABLE public.pl_events
     ADD COLUMN IF NOT EXISTS ended_at TIMESTAMPTZ;
 
+-- GRUPPER / PERMANENTE LIGAER
+CREATE TABLE IF NOT EXISTS public.pl_groups (
+    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    name        TEXT        NOT NULL,
+    code        TEXT        NOT NULL,
+    code_lc     TEXT        UNIQUE NOT NULL,
+    created_by  UUID        REFERENCES public.pl_users(id) ON DELETE SET NULL,
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- SESONGER
 CREATE TABLE IF NOT EXISTS public.pl_seasons (
     id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -87,6 +97,13 @@ CREATE TABLE IF NOT EXISTS public.pl_event_members (
     user_id     UUID        NOT NULL REFERENCES public.pl_users(id) ON DELETE CASCADE,
     joined_at   TIMESTAMPTZ DEFAULT NOW(),
     PRIMARY KEY (event_id,user_id)
+);
+
+CREATE TABLE IF NOT EXISTS public.pl_group_members (
+    group_id    UUID        NOT NULL REFERENCES public.pl_groups(id) ON DELETE CASCADE,
+    user_id     UUID        NOT NULL REFERENCES public.pl_users(id) ON DELETE CASCADE,
+    joined_at   TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (group_id,user_id)
 );
 
 -- ── DRIKKELOGG ─────────────────────────────────────────
@@ -153,10 +170,13 @@ CREATE INDEX IF NOT EXISTS idx_pl_drinks_ts      ON public.pl_drinks(ts);
 CREATE INDEX IF NOT EXISTS idx_pl_drinks_event_id ON public.pl_drinks(event_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_pl_users_auth_user_id ON public.pl_users(auth_user_id);
 CREATE INDEX IF NOT EXISTS idx_pl_events_code_lc ON public.pl_events(code_lc);
+CREATE INDEX IF NOT EXISTS idx_pl_groups_code_lc ON public.pl_groups(code_lc);
 CREATE INDEX IF NOT EXISTS idx_pl_seasons_slug ON public.pl_seasons(slug);
 CREATE INDEX IF NOT EXISTS idx_pl_seasons_range ON public.pl_seasons(starts_at,ends_at);
 CREATE INDEX IF NOT EXISTS idx_pl_event_members_user_id ON public.pl_event_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_pl_event_members_event_id ON public.pl_event_members(event_id);
+CREATE INDEX IF NOT EXISTS idx_pl_group_members_user_id ON public.pl_group_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_pl_group_members_group_id ON public.pl_group_members(group_id);
 CREATE INDEX IF NOT EXISTS idx_pl_drink_comments_drink_id ON public.pl_drink_comments(drink_id);
 CREATE INDEX IF NOT EXISTS idx_pl_drink_reactions_drink_id ON public.pl_drink_reactions(drink_id);
 CREATE INDEX IF NOT EXISTS idx_pl_achievement_reactions_aid ON public.pl_achievement_reactions(achievement_id);
@@ -170,6 +190,8 @@ ALTER TABLE public.pl_drink_types ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pl_events      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pl_seasons     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pl_event_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pl_groups      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pl_group_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pl_drinks      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pl_drink_comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pl_drink_reactions ENABLE ROW LEVEL SECURITY;
@@ -243,6 +265,21 @@ AS $$
     )
 $$;
 
+CREATE OR REPLACE FUNCTION public.is_group_member(group_uuid UUID)
+RETURNS BOOLEAN
+LANGUAGE SQL
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+    SELECT EXISTS (
+        SELECT 1
+        FROM public.pl_group_members
+        WHERE group_id = group_uuid
+          AND user_id = public.current_profile_id()
+    )
+$$;
+
 CREATE OR REPLACE FUNCTION public.can_read_drink(drink_uuid UUID)
 RETURNS BOOLEAN
 LANGUAGE SQL
@@ -271,7 +308,7 @@ DECLARE
     new_event public.pl_events;
 BEGIN
     IF (SELECT auth.uid()) IS NULL THEN
-        RAISE EXCEPTION 'Du må være logget inn.';
+        RAISE EXCEPTION 'Du maa vaere logget inn.';
     END IF;
 
     profile_id := public.current_profile_id();
@@ -316,7 +353,7 @@ DECLARE
     found_event public.pl_events;
 BEGIN
     IF (SELECT auth.uid()) IS NULL THEN
-        RAISE EXCEPTION 'Du må være logget inn.';
+        RAISE EXCEPTION 'Du maa vaere logget inn.';
     END IF;
 
     profile_id := public.current_profile_id();
@@ -342,11 +379,97 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.create_group_with_code(group_name TEXT, input_code TEXT)
+RETURNS public.pl_groups
+LANGUAGE PLPGSQL
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    profile_id UUID;
+    clean_name TEXT;
+    clean_code TEXT;
+    new_group public.pl_groups;
+BEGIN
+    IF (SELECT auth.uid()) IS NULL THEN
+        RAISE EXCEPTION 'Du mÃ¥ vÃ¦re logget inn.';
+    END IF;
+
+    profile_id := public.current_profile_id();
+    IF profile_id IS NULL THEN
+        RAISE EXCEPTION 'Fant ikke profil for innlogget bruker.';
+    END IF;
+
+    clean_name := NULLIF(TRIM(group_name), '');
+    clean_code := UPPER(REGEXP_REPLACE(COALESCE(TRIM(input_code), ''), '[^A-Za-z0-9-]', '', 'g'));
+
+    IF clean_name IS NULL OR CHAR_LENGTH(clean_name) > 48 THEN
+        RAISE EXCEPTION 'Ugyldig navn.';
+    END IF;
+    IF CHAR_LENGTH(clean_code) < 3 OR CHAR_LENGTH(clean_code) > 24 THEN
+        RAISE EXCEPTION 'Ugyldig kode.';
+    END IF;
+
+    INSERT INTO public.pl_groups (name, code, code_lc, created_by)
+    VALUES (clean_name, clean_code, LOWER(clean_code), profile_id)
+    RETURNING * INTO new_group;
+
+    INSERT INTO public.pl_group_members (group_id, user_id)
+    VALUES (new_group.id, profile_id)
+    ON CONFLICT (group_id,user_id) DO NOTHING;
+
+    RETURN new_group;
+EXCEPTION
+    WHEN unique_violation THEN
+        RAISE EXCEPTION 'Koden er allerede brukt.';
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.join_group_by_code(input_code TEXT)
+RETURNS public.pl_groups
+LANGUAGE PLPGSQL
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    profile_id UUID;
+    clean_code TEXT;
+    found_group public.pl_groups;
+BEGIN
+    IF (SELECT auth.uid()) IS NULL THEN
+        RAISE EXCEPTION 'Du mÃ¥ vÃ¦re logget inn.';
+    END IF;
+
+    profile_id := public.current_profile_id();
+    IF profile_id IS NULL THEN
+        RAISE EXCEPTION 'Fant ikke profil for innlogget bruker.';
+    END IF;
+
+    clean_code := LOWER(REGEXP_REPLACE(COALESCE(TRIM(input_code), ''), '[^A-Za-z0-9-]', '', 'g'));
+    SELECT * INTO found_group
+    FROM public.pl_groups
+    WHERE code_lc = clean_code
+    LIMIT 1;
+
+    IF found_group.id IS NULL THEN
+        RAISE EXCEPTION 'Fant ingen gruppe med den koden.';
+    END IF;
+
+    INSERT INTO public.pl_group_members (group_id, user_id)
+    VALUES (found_group.id, profile_id)
+    ON CONFLICT (group_id,user_id) DO NOTHING;
+
+    RETURN found_group;
+END;
+$$;
+
 REVOKE ALL ON TABLE public.pl_users FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.pl_drink_types FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.pl_events FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.pl_seasons FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.pl_event_members FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.pl_groups FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.pl_group_members FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.pl_drinks FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.pl_drink_comments FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.pl_drink_reactions FROM PUBLIC, anon, authenticated;
@@ -361,6 +484,8 @@ GRANT UPDATE (ended_at) ON public.pl_events TO authenticated;
 GRANT DELETE ON public.pl_events TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.pl_seasons TO authenticated;
 GRANT SELECT ON public.pl_event_members TO authenticated;
+GRANT SELECT, DELETE ON public.pl_groups TO authenticated;
+GRANT SELECT, DELETE ON public.pl_group_members TO authenticated;
 GRANT SELECT, INSERT, DELETE ON public.pl_drinks TO authenticated;
 GRANT SELECT, INSERT, DELETE ON public.pl_drink_comments TO authenticated;
 GRANT SELECT, INSERT, DELETE ON public.pl_drink_reactions TO authenticated;
@@ -369,16 +494,22 @@ REVOKE EXECUTE ON FUNCTION public.current_profile_id() FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION public.current_profile_is_admin() FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION public.get_my_profile() FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION public.is_event_member(UUID) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.is_group_member(UUID) FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION public.can_read_drink(UUID) FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION public.create_event_with_code(TEXT,TEXT) FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION public.join_event_by_code(TEXT) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.create_group_with_code(TEXT,TEXT) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.join_group_by_code(TEXT) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.current_profile_id() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.current_profile_is_admin() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_my_profile() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.is_event_member(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_group_member(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.can_read_drink(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.create_event_with_code(TEXT,TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.join_event_by_code(TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.create_group_with_code(TEXT,TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.join_group_by_code(TEXT) TO authenticated;
 
 -- Drop old open policies and recreate least-privilege policies.
 DROP POLICY IF EXISTS "open_access_users"        ON public.pl_users;
@@ -402,6 +533,10 @@ DROP POLICY IF EXISTS "drink_types_delete_self" ON public.pl_drink_types;
 DROP POLICY IF EXISTS "events_select_members"     ON public.pl_events;
 DROP POLICY IF EXISTS "events_update_end_trip"    ON public.pl_events;
 DROP POLICY IF EXISTS "events_delete_created"     ON public.pl_events;
+DROP POLICY IF EXISTS "groups_select_authenticated" ON public.pl_groups;
+DROP POLICY IF EXISTS "groups_delete_created" ON public.pl_groups;
+DROP POLICY IF EXISTS "group_members_select_authenticated" ON public.pl_group_members;
+DROP POLICY IF EXISTS "group_members_delete_self" ON public.pl_group_members;
 DROP POLICY IF EXISTS "seasons_select_authenticated" ON public.pl_seasons;
 DROP POLICY IF EXISTS "seasons_insert_admin" ON public.pl_seasons;
 DROP POLICY IF EXISTS "seasons_update_admin" ON public.pl_seasons;
@@ -459,6 +594,22 @@ CREATE POLICY "events_update_end_trip"
 CREATE POLICY "events_delete_created"
     ON public.pl_events FOR DELETE TO authenticated
     USING (created_by = public.current_profile_id() OR public.current_profile_is_admin());
+
+CREATE POLICY "groups_select_authenticated"
+    ON public.pl_groups FOR SELECT TO authenticated
+    USING (true);
+
+CREATE POLICY "groups_delete_created"
+    ON public.pl_groups FOR DELETE TO authenticated
+    USING (created_by = public.current_profile_id() OR public.current_profile_is_admin());
+
+CREATE POLICY "group_members_select_authenticated"
+    ON public.pl_group_members FOR SELECT TO authenticated
+    USING (true);
+
+CREATE POLICY "group_members_delete_self"
+    ON public.pl_group_members FOR DELETE TO authenticated
+    USING (user_id = public.current_profile_id() OR public.current_profile_is_admin());
 
 CREATE POLICY "seasons_select_authenticated"
     ON public.pl_seasons FOR SELECT TO authenticated
@@ -547,6 +698,20 @@ BEGIN
         WHERE pubname='supabase_realtime' AND schemaname='public' AND tablename='pl_event_members'
     ) THEN
         ALTER PUBLICATION supabase_realtime ADD TABLE public.pl_event_members;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables
+        WHERE pubname='supabase_realtime' AND schemaname='public' AND tablename='pl_groups'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.pl_groups;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables
+        WHERE pubname='supabase_realtime' AND schemaname='public' AND tablename='pl_group_members'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.pl_group_members;
     END IF;
 
     IF NOT EXISTS (
