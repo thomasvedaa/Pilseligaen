@@ -29,6 +29,7 @@ let alcoholMode = localStorage.getItem('pl_alcohol_mode') || 'grams';
 
 const DEFAULT_DTYPES = [
     { id:'d1', name:'Pils 0,33L (4,7%)',    vol_ml:330, abv:4.7,  isDefault:true },
+    { id:'d13', name:'Pils 0,4L (4,7%)',     vol_ml:400, abv:4.7,  isDefault:true },
     { id:'d2', name:'Pils 0,5L (4,7%)',     vol_ml:500, abv:4.7,  isDefault:true },
     { id:'d3', name:'Fatøl 0,5L (5,0%)',    vol_ml:500, abv:5.0,  isDefault:true },
     { id:'d4', name:'Cider 0,33L (4,5%)',   vol_ml:330, abv:4.5,  isDefault:true },
