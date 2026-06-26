@@ -82,7 +82,6 @@ async function renderDashboard() {
     const scopeUsers = await fetchUsersForCurrentScope(allUsers||[]);
     const scopeUserIds = new Set(scopeUsers.map(u=>u.id));
     const myProfile = (allUsers||[]).find(u=>u.id===CU.id) || {username:'Meg'};
-    const now = new Date();
 
     let currentDrinks, lastDrinks, sublabel;
     if (currentEventId || currentSeasonId) {
@@ -90,15 +89,10 @@ async function renderDashboard() {
         lastDrinks = [];
         sublabel = scopeLabel();
     } else {
-        const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const lastMonthStart = new Date(now.getFullYear(), now.getMonth()-1, 1);
         const scoped = visibleDrinksForScope(allDrinks||[]);
-        currentDrinks = scoped.filter(d => new Date(d.ts) >= thisMonthStart);
-        lastDrinks = scoped.filter(d => {
-            const t = new Date(d.ts);
-            return t >= lastMonthStart && t < thisMonthStart;
-        });
-        sublabel = 'Denne måneden';
+        currentDrinks = scoped;
+        lastDrinks = [];
+        sublabel = 'Totalt';
     }
 
     const sumUser = (arr, uid) => arr
@@ -108,8 +102,8 @@ async function renderDashboard() {
     const groupNow = sumUser(currentDrinks, null);
     const monthFloor = 12 * ALCOHOL_UNIT_GRAMS;
     const scopedPeriod = currentEventId || currentSeasonId;
-    const myLast   = scopedPeriod ? 100 : Math.max(sumUser(lastDrinks, CU.id), monthFloor);
-    const groupLast= scopedPeriod ? Math.max(100, scopeUsers.length*100) : Math.max(sumUser(lastDrinks, null), scopeUsers.length * monthFloor);
+    const myLast   = scopedPeriod ? 100 : Math.max(myNow, monthFloor);
+    const groupLast= scopedPeriod ? Math.max(100, scopeUsers.length*100) : Math.max(groupNow, scopeUsers.length * monthFloor);
 
     const myLastDisplay    = scopedPeriod ? 0 : sumUser(lastDrinks, CU.id);
     const groupLastDisplay = scopedPeriod ? 0 : sumUser(lastDrinks, null);
