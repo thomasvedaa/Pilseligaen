@@ -101,7 +101,9 @@ async function renderDashboard() {
         sublabel = 'Denne måneden';
     }
 
-    const sumUser = (arr, uid) => arr.filter(d=>scopeUserIds.has(d.user_id)&&(uid?d.user_id===uid:true)).reduce((s,d)=>s+d.grams,0);
+    const sumUser = (arr, uid) => arr
+        .filter(d=>scopeUserIds.has(d.user_id)&&(uid?d.user_id===uid:true))
+        .reduce((s,d)=>s+(Number(d.grams)||0),0);
     const myNow    = sumUser(currentDrinks, CU.id);
     const groupNow = sumUser(currentDrinks, null);
     const monthFloor = 12 * ALCOHOL_UNIT_GRAMS;
@@ -466,13 +468,17 @@ async function deleteDrink(id) {
     if (error){showToast('Kunne ikke slette registreringen.',false);return;}
     if (!data?.length){showToast('Fant ikke en egen registrering å slette.',false);return;}
     showToast('Slettet');
-    await refreshAfterDrinkDelete();
+    await refreshAfterDrinkChange();
 }
 
-async function refreshAfterDrinkDelete() {
+async function refreshAfterDrinkChange() {
     const view=activeViewName();
     if (view==='dashboard') { await renderDashboard(); return; }
-    if (view==='log') { await renderMyDrinksList(); return; }
+    if (view==='log') {
+        await renderMyDrinksList();
+        await renderDashboard();
+        return;
+    }
     if (view==='stats') { await renderStats(); return; }
     if (view==='lb') { await fetchAndRenderLb(lbFilter); return; }
     if (view==='achievements') { await renderAchievements(); return; }

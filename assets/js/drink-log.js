@@ -108,7 +108,7 @@ async function handleLogDrink() {
     document.getElementById('log-note').value=''; document.getElementById('log-city').value=''; document.getElementById('log-prev').style.display='none';
     document.getElementById('log-city-status').textContent='';
     resetDt();
-    await renderMyDrinksList();
+    await refreshAfterDrinkChange();
 }
 
 async function renderMyDrinksList() {
