@@ -402,17 +402,18 @@ function achievementUnlockStats(summaries) {
 async function loadAchievementData() {
     const [
         {data:users,error:userError},
-        {data:drinks,error:drinkError},
+        drinksRes,
         commentsRes,
         endedEventsRes,
         membersRes
     ]=await Promise.all([
         sb.from('pl_users').select(PROFILE_SELECT),
-        sb.from('pl_drinks').select('*'),
+        fetchAllRows(()=>sb.from('pl_drinks').select('*').order('created_at',{ascending:true})),
         sb.from('pl_drink_comments').select('user_id'),
         sb.from('pl_events').select('*').not('ended_at','is',null),
         sb.from('pl_event_members').select('event_id,user_id')
     ]);
+    const {data:drinks,error:drinkError}=drinksRes;
     if (userError || drinkError) return {error:userError||drinkError};
 
     const commenters=new Set((commentsRes?.data||[]).map(c=>c.user_id));

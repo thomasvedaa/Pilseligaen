@@ -278,6 +278,19 @@ function showToast(msg, ok=true) {
     document.body.appendChild(t); setTimeout(()=>t.remove(),2700);
 }
 
+const DB_PAGE_SIZE = 1000;
+
+async function fetchAllRows(buildQuery, pageSize=DB_PAGE_SIZE) {
+    const rows=[];
+    for (let from=0;;from+=pageSize) {
+        const {data,error}=await buildQuery().range(from,from+pageSize-1);
+        if (error) return {data:rows,error};
+        const page=data||[];
+        rows.push(...page);
+        if (page.length<pageSize) return {data:rows,error:null};
+    }
+}
+
 const CHART_OPTS = {
     responsive:true, maintainAspectRatio:false,
     plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>formatChartValue(c.parsed.y)}} },

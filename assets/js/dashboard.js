@@ -74,7 +74,7 @@ async function renderDashboard() {
     renderDrinkFeed();
 
     const [{data:allDrinks,error},{data:allUsers}] = await Promise.all([
-        sb.from('pl_drinks').select('*'),
+        fetchAllRows(()=>sb.from('pl_drinks').select('*').order('created_at',{ascending:true})),
         sb.from('pl_users').select(PROFILE_SELECT)
     ]);
     if (error){document.getElementById('recent-drinks').innerHTML=`<div class="empty">Feil: ${error.message}</div>`;return;}
@@ -210,7 +210,7 @@ async function fetchFeedInteractions(drinkIds,achievementIds=[]) {
 async function renderDrinkFeed() {
     const el=document.getElementById('drink-feed');
     const [{data:drinks,error},{data:users},{data:endedEvents},{data:members},{data:comments}] = await Promise.all([
-        sb.from('pl_drinks').select('*').order('ts',{ascending:false}),
+        fetchAllRows(()=>sb.from('pl_drinks').select('*').order('ts',{ascending:false})),
         sb.from('pl_users').select(PROFILE_SELECT),
         sb.from('pl_events').select('*').not('ended_at','is',null),
         sb.from('pl_event_members').select('event_id,user_id'),
