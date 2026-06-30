@@ -117,9 +117,12 @@ async function openCommentNotification(drinkId) {
     closeCommentNotifications();
     await showView('dashboard');
     await renderDrinkFeed();
-    const input=document.getElementById(`feed-comment-${drinkId}`);
-    input?.scrollIntoView({behavior:'smooth',block:'center'});
-    input?.focus();
+    const item=document.getElementById(`feed-drink-${drinkId}`);
+    if (!item) return;
+    document.querySelectorAll('.feed-item.notif-target').forEach(el=>el.classList.remove('notif-target'));
+    item.classList.add('notif-target');
+    item.scrollIntoView({behavior:'smooth',block:'start',inline:'nearest'});
+    setTimeout(()=>item.classList.remove('notif-target'),2400);
 }
 
 function initCommentNotifications() {
@@ -444,7 +447,7 @@ function renderDrinkFeedItem(d,interactions,byUser) {
     const commentUsers=interactions.commentUsersByDrink[d.id]||[];
     const reactions=interactions.reactionsByDrink[d.id]||{};
     const reactionUsers=interactions.reactionUsersByDrink[d.id]||{};
-    return `<div class="feed-item">
+    return `<div class="feed-item" id="feed-drink-${esc(d.id)}">
         <div class="feed-head">
             ${avatarHtml(user,30,'.78em')}
             <div class="dinf">
