@@ -36,6 +36,15 @@ const ACHIEVEMENTS = [
 
 ];
 
+ACHIEVEMENTS.splice(ACHIEVEMENTS.findIndex(a=>a.id==='tur_konge'),0,{
+    id:'gonster',
+    icon:'G',
+    name:'Gonster',
+    desc:'yummers',
+    check:s=>s.hasGonster,
+    progress:s=>s.hasGonster?'Klar':'0/1'
+});
+
 function achievementById(id) {
     return ACHIEVEMENTS.find(a=>a.id===id);
 }
@@ -122,6 +131,7 @@ function summarizeAchievements(user,drinks,extra={}) {
     let hasComeback=false;
     let guinnessCount=0;
     let hasEnergyBeer=false;
+    const gonsterDays={};
 
     sorted.forEach((d,i)=>{
         const k=dayKey(d.ts);
@@ -138,7 +148,10 @@ function summarizeAchievements(user,drinks,extra={}) {
 
         const txt=`${d.type_name||''} ${d.note||''}`.toLowerCase();
         if (/(chilli|chili|klaus)/.test(txt)) hasChilli=true;
-        if (/guinness/.test(txt)) guinnessCount+=Number(d.qty)||1;
+        if (/guinness|guiness|gonster/.test(txt)) guinnessCount+=Number(d.qty)||1;
+        const gonsterDay=(gonsterDays[k] ||= {guinness:false,monster:false});
+        if (/guinness|guiness|gonster/.test(txt)) gonsterDay.guinness=true;
+        if (/monster|gonster/.test(txt)) gonsterDay.monster=true;
         if (/energi[øo]l/.test(txt)) hasEnergyBeer=true;
 
         const hour=new Date(d.ts).getHours();
@@ -160,6 +173,7 @@ function summarizeAchievements(user,drinks,extra={}) {
     const maxEveningHalfLiters=Math.max(0,...Object.values(eveningHalfLiters));
     const hasAllCategoriesDay=Object.values(dayCategories).some(set=>set.has('beer') && set.has('wine') && set.has('spirits'));
     const hasWeekendRun=Object.values(weekendMap).some(set=>set.has(4) && set.has(5) && set.has(6));
+    const hasGonster=Object.values(gonsterDays).some(day=>day.guinness && day.monster);
     const maxMonthDays=Math.max(0,...Object.values(monthDays).map(set=>set.size));
     const maxMonthBeerLiters=Math.max(0,...Object.values(monthBeerLiters));
     const unlocked=ACHIEVEMENTS.filter(a=>a.check({
@@ -183,6 +197,7 @@ function summarizeAchievements(user,drinks,extra={}) {
         maxMonthDays,
         maxMonthBeerLiters,
         guinnessCount,
+        hasGonster,
         hasEnergyBeer,
         hasCommented,
         turKongeWins:extra.turKongeWins||0,
@@ -215,6 +230,7 @@ function summarizeAchievements(user,drinks,extra={}) {
         maxMonthDays,
         maxMonthBeerLiters,
         guinnessCount,
+        hasGonster,
         hasEnergyBeer,
         hasCommented,
         turKongeWins:extra.turKongeWins||0,
@@ -242,6 +258,7 @@ function achievementUnlockEvents(user,drinks,comments=[]) {
     let lastDay=null;
     let dayRun=0;
     let guinnessCount=0;
+    const gonsterDays={};
 
     const unlock=(id,item)=>{
         if (unlocked.has(id)) return;
@@ -307,11 +324,15 @@ function achievementUnlockEvents(user,drinks,comments=[]) {
 
         const txt=`${d.type_name||''} ${d.note||''}`.toLowerCase();
         if (/(chilli|chili|klaus)/.test(txt)) unlock('chilli_klaus',d);
-        if (/guinness/.test(txt)) {
+        if (/guinness|guiness|gonster/.test(txt)) {
             guinnessCount+=Number(d.qty)||1;
             if (guinnessCount>=1) unlock('split_the_g',d);
             if (guinnessCount>=100) unlock('g_spot',d);
         }
+        const gonsterDay=(gonsterDays[k] ||= {guinness:false,monster:false});
+        if (/guinness|guiness|gonster/.test(txt)) gonsterDay.guinness=true;
+        if (/monster|gonster/.test(txt)) gonsterDay.monster=true;
+        if (gonsterDay.guinness && gonsterDay.monster) unlock('gonster',d);
         if (/energi[øo]l/.test(txt)) unlock('legendary_pull',d);
 
         const hour=new Date(d.ts).getHours();

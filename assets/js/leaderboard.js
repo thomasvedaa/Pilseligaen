@@ -117,18 +117,30 @@ function hideLbCharts() {
 
 async function fetchAndRenderLb(filter) {
     const {start,end}=getLbRange(filter);
-    let drinkQuery=sb.from('pl_drinks').select('user_id,event_id,type_name,vol_ml,abv,qty,grams,ts');
-    if (start) drinkQuery=drinkQuery.gte('ts',start.toISOString());
-    if (end) drinkQuery=drinkQuery.lt('ts',end.toISOString());
+    const buildDrinkQuery=()=>{
+        let query=sb.from('pl_drinks')
+            .select('user_id,event_id,type_name,vol_ml,abv,qty,grams,ts')
+            .order('ts',{ascending:true});
+        if (start) query=query.gte('ts',start.toISOString());
+        if (end) query=query.lt('ts',end.toISOString());
+        return query;
+    };
 
-    const {data:allDrinksRaw} = await drinkQuery;
-    const {data:usersRaw}     = await sb.from('pl_users').select(PROFILE_SELECT);
-    if (!allDrinksRaw||!usersRaw) return;
+    const [{data:allDrinksRaw,error:drinkError},{data:usersRaw,error:userError}] = await Promise.all([
+        fetchAllRows(buildDrinkQuery),
+        sb.from('pl_users').select(PROFILE_SELECT)
+    ]);
+    const el=document.getElementById('lb-list');
+    if (drinkError || userError) {
+        el.innerHTML=`<div class="empty">Kunne ikke laste topplisten: ${esc((drinkError||userError).message||'Ukjent feil')}</div>`;
+        document.getElementById('lb-count-note').textContent='';
+        hideLbCharts();
+        return;
+    }
 
     const users=await fetchUsersForCurrentScope(usersRaw||[]);
     const drinks=visibleDrinksForScope(allDrinksRaw||[]);
     const ranked=aggregateLeaderboard(users,drinks);
-    const el=document.getElementById('lb-list');
 
     if (ranked.every(u=>u.rawGrams===0)){
         el.innerHTML='<div class="empty">Ingen drikke i denne perioden.</div>';

@@ -156,6 +156,7 @@ function toggleTopbarMenu(force) {
     const btn=document.getElementById('topbar-menu-toggle');
     if (!panel || !btn) return;
     const open=typeof force==='boolean' ? force : !panel.classList.contains('open');
+    if (open && typeof closeCommentNotifications==='function') closeCommentNotifications();
     panel.classList.toggle('open',open);
     btn.setAttribute('aria-expanded',open?'true':'false');
 }
@@ -215,6 +216,7 @@ async function startApp(user) {
     updateEventControls();
     updateGroupControls();
     resetDt();
+    if (typeof initCommentNotifications==='function') initCommentNotifications();
     await loadRouteFromLocation({replace:true});
 }
 

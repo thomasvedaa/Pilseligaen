@@ -32,7 +32,7 @@
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-    <link rel="stylesheet" href="assets/css/styles.css?v=20260616-group-tools">
+    <link rel="stylesheet" href="assets/css/styles.css?v=20260630-prev-heading-center">
 </head>
 <body>
 
@@ -73,6 +73,16 @@
     <div class="topbar">
         <button class="brand brand-link" type="button" data-route="/">🍺 Pilseligaen</button>
         <div class="topbar-r">
+            <div class="notif-bell" id="comment-notif">
+                <button class="notif-btn" id="comment-notif-toggle" type="button" onclick="toggleCommentNotifications()" aria-haspopup="true" aria-expanded="false" aria-controls="comment-notif-panel" title="Kommentarer">
+                    <span class="notif-icon">🔔</span>
+                    <span class="notif-count" id="comment-notif-count" style="display:none">0</span>
+                </button>
+                <div class="notif-panel" id="comment-notif-panel">
+                    <div class="notif-title">Kommentarer</div>
+                    <div id="comment-notif-list"><div class="notif-empty">Laster...</div></div>
+                </div>
+            </div>
             <div class="topbar-user">
                 <div class="avatar" id="usr-av">?</div>
                 <span class="uname" id="usr-nm"></span>
@@ -395,22 +405,22 @@
     </nav>
 </div>
 
-<script src="assets/js/core.js?v=20260520-trips-achievements"></script>
+<script src="assets/js/core.js?v=20260630-gonster-card"></script>
 <script src="assets/js/supabase-client.js?v=20260520-events-h2h2"></script>
 <script src="assets/js/boot.js?v=20260520-events-h2h2"></script>
 <script src="assets/js/auth.js?v=20260616-groups"></script>
 <script src="assets/js/seasons.js?v=20260528-sommer-2026"></script>
 <script src="assets/js/pages.js?v=20260616-groups"></script>
-<script src="assets/js/app.js?v=20260616-group-tools"></script>
+<script src="assets/js/app.js?v=20260630-comment-bell"></script>
 <script src="assets/js/events.js?v=20260528-scope-toggle"></script>
 <script src="assets/js/groups.js?v=20260616-group-tools"></script>
 <script src="assets/js/admin.js?v=20260528-pages-admin"></script>
 <script src="assets/js/drink-types.js?v=20260520-events-h2h2"></script>
 <script src="assets/js/drink-log.js?v=20260626-drink-refresh"></script>
-<script src="assets/js/dashboard.js?v=20260626-total-refresh"></script>
+<script src="assets/js/dashboard.js?v=20260630-prev-heading-center"></script>
 <script src="assets/js/stats.js?v=20260520-events-h2h2"></script>
-<script src="assets/js/leaderboard.js?v=20260520-events-h2h2"></script>
-<script src="assets/js/achievements.js?v=20260531-streak-fix"></script>
+<script src="assets/js/leaderboard.js?v=20260630-lb-full-drinks"></script>
+<script src="assets/js/achievements.js?v=20260630-gonster-yummers"></script>
 <script src="assets/js/confetti.js?v=20260520-confettifix"></script>
 </body>
 </html>

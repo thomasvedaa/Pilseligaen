@@ -5,6 +5,142 @@ const FEED_REACTIONS = ['🔥','😂','👏','💀','🍺'];
 const FEED_PAGE_SIZE = 30;
 let feedLimit = FEED_PAGE_SIZE;
 let openInteractionDetailsId = null;
+let commentNotifChannel = null;
+let commentNotifRows = [];
+let commentNotifBound = false;
+
+function commentNotifSeenKey() {
+    return CU ? `pl_comment_notif_seen_${CU.id}` : 'pl_comment_notif_seen';
+}
+
+function commentNotifSeenAt() {
+    return localStorage.getItem(commentNotifSeenKey()) || '';
+}
+
+function setCommentNotifSeenAt(value=new Date().toISOString()) {
+    localStorage.setItem(commentNotifSeenKey(),value);
+}
+
+function isCommentUnread(row) {
+    const seen=commentNotifSeenAt();
+    return !seen || new Date(row.created_at)>new Date(seen);
+}
+
+function closeCommentNotifications() {
+    const panel=document.getElementById('comment-notif-panel');
+    const btn=document.getElementById('comment-notif-toggle');
+    if (panel) panel.classList.remove('open');
+    if (btn) btn.setAttribute('aria-expanded','false');
+}
+
+function renderCommentNotifications(rows=commentNotifRows) {
+    const countEl=document.getElementById('comment-notif-count');
+    const listEl=document.getElementById('comment-notif-list');
+    if (!countEl || !listEl) return;
+
+    const unread=rows.filter(isCommentUnread).length;
+    countEl.textContent=unread>99?'99+':String(unread);
+    countEl.style.display=unread?'inline-block':'none';
+
+    if (!rows.length) {
+        listEl.innerHTML='<div class="notif-empty">Ingen kommentarer på dine innlegg ennå.</div>';
+        return;
+    }
+
+    listEl.innerHTML=rows.slice(0,12).map(row=>{
+        const commenter=row.user||{username:'Ukjent'};
+        const drink=row.drink||{};
+        const unreadClass=isCommentUnread(row)?' unread':'';
+        return `<button class="notif-item${unreadClass}" type="button" onclick="openCommentNotification('${row.drink_id}')">
+            <div><strong>${esc(displayName(commenter))}</strong> kommenterte på ${esc(drink.type_name||'innlegget ditt')}</div>
+            <div class="notif-meta">${fmtDate(row.created_at)}</div>
+            <div class="notif-body">${esc(row.body)}</div>
+        </button>`;
+    }).join('');
+}
+
+async function refreshCommentNotifications() {
+    if (!CU) return;
+    const {data:myDrinks,error:drinkError}=await sb.from('pl_drinks')
+        .select('id,type_name,ts')
+        .eq('user_id',CU.id)
+        .order('ts',{ascending:false})
+        .limit(100);
+    if (drinkError || !myDrinks?.length) {
+        commentNotifRows=[];
+        renderCommentNotifications();
+        return;
+    }
+
+    const drinkIds=myDrinks.map(d=>d.id);
+    const [{data:comments,error:commentError},{data:users}] = await Promise.all([
+        sb.from('pl_drink_comments')
+            .select('id,drink_id,user_id,body,created_at')
+            .in('drink_id',drinkIds)
+            .neq('user_id',CU.id)
+            .order('created_at',{ascending:false})
+            .limit(50),
+        sb.from('pl_users').select(PROFILE_SELECT)
+    ]);
+    if (commentError) {
+        commentNotifRows=[];
+        renderCommentNotifications();
+        return;
+    }
+
+    const drinkById=Object.fromEntries(myDrinks.map(d=>[d.id,d]));
+    const userById=Object.fromEntries((users||[]).map(u=>[u.id,u]));
+    commentNotifRows=(comments||[]).map(c=>({
+        ...c,
+        drink:drinkById[c.drink_id],
+        user:userById[c.user_id]
+    }));
+    renderCommentNotifications();
+}
+
+async function toggleCommentNotifications(force) {
+    const panel=document.getElementById('comment-notif-panel');
+    const btn=document.getElementById('comment-notif-toggle');
+    if (!panel || !btn) return;
+    const open=typeof force==='boolean' ? force : !panel.classList.contains('open');
+    panel.classList.toggle('open',open);
+    btn.setAttribute('aria-expanded',open?'true':'false');
+    if (open) {
+        await refreshCommentNotifications();
+        const newest=commentNotifRows[0]?.created_at;
+        if (newest) setCommentNotifSeenAt(newest);
+        renderCommentNotifications();
+    }
+}
+
+async function openCommentNotification(drinkId) {
+    closeCommentNotifications();
+    await showView('dashboard');
+    await renderDrinkFeed();
+    const input=document.getElementById(`feed-comment-${drinkId}`);
+    input?.scrollIntoView({behavior:'smooth',block:'center'});
+    input?.focus();
+}
+
+function initCommentNotifications() {
+    if (!CU) return;
+    if (!commentNotifBound) {
+        document.addEventListener('click',event=>{
+            if (!event.target.closest('.notif-bell')) closeCommentNotifications();
+        });
+        document.addEventListener('keydown',event=>{
+            if (event.key==='Escape') closeCommentNotifications();
+        });
+        commentNotifBound=true;
+    }
+    if (!commentNotifChannel) {
+        commentNotifChannel=sb.channel('comment-notifications')
+            .on('postgres_changes',{event:'*',schema:'public',table:'pl_drink_comments'},()=>refreshCommentNotifications())
+            .on('postgres_changes',{event:'*',schema:'public',table:'pl_drinks'},()=>refreshCommentNotifications())
+            .subscribe();
+    }
+    refreshCommentNotifications();
+}
 
 function renderBeerGlassHtml(totalGrams, maxGrams, name, sublabel, lastGrams) {
     const rawPct = maxGrams > 0 ? totalGrams / maxGrams : 0;
@@ -65,6 +201,51 @@ function animateBeerGlass() {
     });
 }
 
+function previousMonthRange(now=new Date()) {
+    return {
+        start:new Date(now.getFullYear(),now.getMonth()-1,1),
+        end:new Date(now.getFullYear(),now.getMonth(),1)
+    };
+}
+
+function currentMonthRange(now=new Date()) {
+    return {
+        start:new Date(now.getFullYear(),now.getMonth(),1),
+        end:new Date(now.getFullYear(),now.getMonth()+1,1)
+    };
+}
+
+function drinksInRange(drinks,start,end) {
+    return (drinks||[]).filter(d=>{
+        const ts=new Date(d.ts);
+        return ts>=start && ts<end;
+    });
+}
+
+function formatUnitsOnly(gramsValue) {
+    return `${fmtNo((Number(gramsValue)||0)/ALCOHOL_UNIT_GRAMS,1)} enheter`;
+}
+
+function previousMonthName(start) {
+    return start.toLocaleDateString('no-NO',{month:'long'});
+}
+
+function currentMonthName(start) {
+    return start.toLocaleDateString('no-NO',{month:'long'});
+}
+
+function renderPreviousMonthSummary(myGrams,groupGrams,range) {
+    return `<div class="beer-prev-summary">
+        <div class="beer-prev-heading">Forrige m&aring;ned (${esc(previousMonthName(range.start))})</div>
+        <div class="beer-prev-col">
+            <div class="beer-prev-value">Du <strong>${formatUnitsOnly(myGrams)}</strong></div>
+        </div>
+        <div class="beer-prev-col">
+            <div class="beer-prev-value">Gruppen <strong>${formatUnitsOnly(groupGrams)}</strong></div>
+        </div>
+    </div>`;
+}
+
 async function renderDashboard() {
     document.getElementById('dash-stats').innerHTML='';
     document.getElementById('recent-drinks').innerHTML='<div class="vload"><div class="spinner"></div>Laster…</div>';
@@ -84,15 +265,17 @@ async function renderDashboard() {
     const myProfile = (allUsers||[]).find(u=>u.id===CU.id) || {username:'Meg'};
 
     let currentDrinks, lastDrinks, sublabel;
+    const currentRange=currentMonthRange();
+    const previousRange=previousMonthRange();
     if (currentEventId || currentSeasonId) {
         currentDrinks = visibleDrinksForScope(allDrinks||[]);
         lastDrinks = [];
         sublabel = scopeLabel();
     } else {
         const scoped = visibleDrinksForScope(allDrinks||[]);
-        currentDrinks = scoped;
-        lastDrinks = [];
-        sublabel = 'Totalt';
+        currentDrinks = drinksInRange(scoped,currentRange.start,currentRange.end);
+        lastDrinks = drinksInRange(scoped,previousRange.start,previousRange.end);
+        sublabel = currentMonthName(currentRange.start);
     }
 
     const sumUser = (arr, uid) => arr
@@ -108,10 +291,12 @@ async function renderDashboard() {
     const myLastDisplay    = scopedPeriod ? 0 : sumUser(lastDrinks, CU.id);
     const groupLastDisplay = scopedPeriod ? 0 : sumUser(lastDrinks, null);
 
-    document.getElementById('dash-stats').innerHTML = `<div class="beer-glass-pair">
-        ${renderBeerGlassHtml(myNow,    myLast,    displayName(myProfile), sublabel, myLastDisplay)}
-        ${renderBeerGlassHtml(groupNow, groupLast, 'Gruppen',              sublabel, groupLastDisplay)}
-    </div>`;
+    document.getElementById('dash-stats').innerHTML = `
+    <div class="beer-glass-pair">
+        ${renderBeerGlassHtml(myNow,    myLast,    displayName(myProfile), sublabel, 0)}
+        ${renderBeerGlassHtml(groupNow, groupLast, 'Gruppen',              sublabel, 0)}
+    </div>
+    ${scopedPeriod ? '' : renderPreviousMonthSummary(myLastDisplay,groupLastDisplay,previousRange)}`;
     animateBeerGlass();
 
     const myDrinks = visibleDrinksForScope((allDrinks||[]).filter(d=>d.user_id===CU.id));
@@ -342,12 +527,14 @@ async function addAchievementComment(achId,inputId) {
     const {error}=await sb.from('pl_achievement_comments').insert({achievement_id:achId,user_id:CU.id,body});
     if (error){showToast('Kjør oppdatert schema.sql for kommentarer.',false);return;}
     input.value='';
+    refreshCommentNotifications();
     await renderDrinkFeed();
 }
 
 async function deleteAchievementComment(id) {
     const {error}=await sb.from('pl_achievement_comments').delete().eq('id',id).eq('user_id',CU.id);
     if (error){showToast('Kunne ikke slette kommentar.',false);return;}
+    refreshCommentNotifications();
     await renderDrinkFeed();
 }
 
@@ -429,12 +616,14 @@ async function addFeedComment(drinkId) {
     const {error}=await sb.from('pl_drink_comments').insert({drink_id:drinkId,user_id:CU.id,body});
     if (error){showToast('Kjør oppdatert schema.sql for kommentarer.',false);return;}
     input.value='';
+    refreshCommentNotifications();
     await renderDrinkFeed();
 }
 
 async function deleteFeedComment(id) {
     const {error}=await sb.from('pl_drink_comments').delete().eq('id',id).eq('user_id',CU.id);
     if (error){showToast('Kunne ikke slette kommentar.',false);return;}
+    refreshCommentNotifications();
     await renderDrinkFeed();
 }
 
